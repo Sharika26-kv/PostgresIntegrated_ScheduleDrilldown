@@ -1,0 +1,1873 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portfolio Management - NIRMAN</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="dashboard.css">
+    <link rel="stylesheet" href="css/sidebar.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            /* Professional Color Palette */
+            --primary-blue: #1e40af;
+            --primary-blue-light: #3b82f6;
+            --primary-blue-dark: #1e3a8a;
+            --secondary-slate: #475569;
+            --secondary-slate-light: #64748b;
+            --accent-emerald: #059669;
+            --accent-amber: #d97706;
+            --accent-rose: #e11d48;
+            --neutral-50: #f8fafc;
+            --neutral-100: #f1f5f9;
+            --neutral-200: #e2e8f0;
+            --neutral-300: #cbd5e1;
+            --neutral-400: #94a3b8;
+            --neutral-500: #64748b;
+            --neutral-600: #475569;
+            --neutral-700: #334155;
+            --neutral-800: #1e293b;
+            --neutral-900: #0f172a;
+            
+            /* Milestone Colors */
+            --milestone-planning: #3b82f6;
+            --milestone-execution: #059669;
+            --milestone-review: #d97706;
+            --milestone-critical: #e11d48;
+            --milestone-foundation: #8b5cf6;
+            --milestone-structure: #06b6d4;
+            
+            /* Typography */
+            --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --header-font: 'Inter', sans-serif;
+            
+            /* Spacing */
+            --spacing-xs: 0.25rem;
+            --spacing-sm: 0.5rem;
+            --spacing-md: 1rem;
+            --spacing-lg: 1.5rem;
+            --spacing-xl: 2rem;
+            --spacing-2xl: 3rem;
+            
+            /* Shadows */
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        
+        * {
+            font-family: var(--font-family);
+        }
+        
+        /* Main Container */
+        .timeline-container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: var(--shadow-xl);
+            overflow: hidden;
+            border: 1px solid var(--neutral-200);
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+        }
+        
+        /* Header Section */
+        .timeline-header {
+            display: flex;
+            background: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-blue-dark) 100%);
+            border-bottom: 3px solid var(--neutral-200);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .timeline-header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/></pattern></defs><rect width="100" height="100" fill="url(%23grid)"/></svg>');
+            opacity: 0.3;
+        }
+        
+        .timeline-labels {
+            width: 300px;
+            padding: var(--spacing-md);
+            font-weight: 600;
+            font-size: 1rem;
+            color: white;
+            border-right: 3px solid rgba(255, 255, 255, 0.2);
+            position: relative;
+            z-index: 1;
+            display: flex;
+            align-items: center;
+        }
+        
+        .timeline-labels::before {
+            content: '📊';
+            margin-right: var(--spacing-xs);
+            font-size: 1.125rem;
+        }
+        
+        .timeline-scale {
+            flex: 1;
+            position: relative;
+            padding: var(--spacing-md) var(--spacing-lg);
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.9);
+            z-index: 1;
+            height: 60px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .scale-mark {
+            position: absolute;
+            text-align: center;
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: 500;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 2px var(--spacing-xs);
+            border-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(4px);
+        }
+        
+        .scale-line {
+            position: absolute;
+            width: 1px;
+            height: 20px;
+            background: linear-gradient(to bottom, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.6));
+            top: 35px;
+            border-radius: 1px;
+        }
+        
+        .scale-grid-line {
+            position: absolute;
+            width: 1px;
+            height: 100%;
+            background: var(--neutral-200);
+            opacity: 0.5;
+            top: 0;
+        }
+        
+        /* Timeline Body */
+        .timeline-body {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            background: white;
+        }
+        
+        .timeline-body::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .timeline-body::-webkit-scrollbar-track {
+            background: var(--neutral-100);
+        }
+        
+        .timeline-body::-webkit-scrollbar-thumb {
+            background: var(--neutral-400);
+            border-radius: 4px;
+        }
+        
+        .timeline-body::-webkit-scrollbar-thumb:hover {
+            background: var(--neutral-500);
+        }
+        
+        /* Timeline Rows */
+        .timeline-row {
+            display: flex;
+            border-bottom: 1px solid var(--neutral-100);
+            min-height: 60px;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        
+        .timeline-row:hover {
+            background: linear-gradient(to right, var(--neutral-50), white);
+            box-shadow: inset 4px 0 0 var(--primary-blue-light);
+        }
+        
+        .timeline-row:nth-child(even) {
+            background: rgba(248, 250, 252, 0.5);
+        }
+        
+        /* Baseline and Monthly Row Styling */
+        .baseline-row {
+            border-left: 4px solid var(--primary-blue);
+            background: linear-gradient(to right, rgba(59, 130, 246, 0.05), white);
+        }
+        
+        .monthly-row {
+            border-left: 4px solid var(--accent-emerald);
+            background: linear-gradient(to right, rgba(5, 150, 105, 0.05), white);
+            margin-bottom: 8px; /* Add spacing between project groups */
+        }
+        
+        .no-baseline {
+            color: var(--neutral-500);
+            font-style: italic;
+        }
+        
+        /* Drift Line Styling */
+        .drift-line {
+            cursor: pointer;
+            transition: opacity 0.3s ease;
+        }
+        
+        .drift-line:hover {
+            opacity: 1 !important;
+        }
+        
+        .drift-arrow {
+            transition: transform 0.2s ease;
+        }
+        
+        .drift-line:hover .drift-arrow {
+            transform: scale(1.2);
+        }
+        
+        /* Enhanced milestone spacing for grouped view */
+        .milestone {
+            margin-right: 8px;
+        }
+        
+        /* Row Labels */
+        .row-label {
+            width: 300px;
+            padding: var(--spacing-sm) var(--spacing-md);
+            background: linear-gradient(135deg, var(--neutral-50), white);
+            border-right: 3px solid var(--neutral-200);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            position: relative;
+        }
+        
+        .row-label::after {
+            content: '';
+            position: absolute;
+            right: -3px;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background: linear-gradient(to bottom, var(--primary-blue-light), var(--primary-blue));
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .timeline-row:hover .row-label::after {
+            opacity: 1;
+        }
+        
+        .project-name {
+            font-weight: 600;
+            color: var(--neutral-800);
+            font-size: 0.875rem;
+            margin-bottom: 2px;
+            line-height: 1.3;
+        }
+        
+        .project-date {
+            font-size: 0.75rem;
+            color: var(--neutral-500);
+            font-weight: 400;
+        }
+        
+        /* Timeline Content */
+        .timeline-content {
+            flex: 1;
+            position: relative;
+            padding: var(--spacing-sm) 0;
+            min-height: 60px;
+            background: linear-gradient(90deg, 
+                transparent 0%, 
+                rgba(30, 64, 175, 0.02) 25%, 
+                rgba(30, 64, 175, 0.02) 75%, 
+                transparent 100%);
+            overflow: visible;
+        }
+        
+        /* Grid Lines */
+        .timeline-content::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: 
+                linear-gradient(90deg, var(--neutral-200) 1px, transparent 1px);
+            background-size: 10% 100%;
+            opacity: 0.3;
+            pointer-events: none;
+        }
+        
+        /* Milestones */
+        .milestone {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 10;
+            gap: var(--spacing-xs);
+        }
+        
+        .milestone:hover {
+            z-index: 99998;
+        }
+        
+        .milestone:hover {
+            transform: translateY(-50%) scale(1.1);
+            z-index: 20;
+        }
+        
+        /* Vertical indicator line */
+        .milestone::before {
+            content: '';
+            position: absolute;
+            left: 10px;
+            top: -20px;
+            height: 40px;
+            width: 1px;
+            background: linear-gradient(to bottom, 
+                transparent 0%, 
+                var(--neutral-300) 20%, 
+                var(--neutral-400) 50%, 
+                var(--neutral-300) 80%, 
+                transparent 100%);
+            z-index: 0;
+            pointer-events: none;
+            opacity: 0.6;
+        }
+        
+        .milestone-icon {
+            font-size: 1.25rem;
+            filter: drop-shadow(0 1px 2px rgba(0,0,0,0.1));
+            transition: all 0.3s ease;
+            position: relative;
+            z-index: 2;
+            font-weight: bold;
+            text-shadow: 0 0 2px rgba(255,255,255,0.8);
+            flex-shrink: 0;
+        }
+        
+        .milestone-icon::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 120%;
+            height: 120%;
+            background: radial-gradient(circle, rgba(255,255,255,0.8) 0%, transparent 70%);
+            border-radius: 50%;
+            z-index: -1;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .milestone:hover .milestone-icon::before {
+            opacity: 1;
+        }
+        
+        .milestone-label {
+            font-size: 0.6875rem;
+            background: linear-gradient(135deg, white 0%, var(--neutral-50) 100%);
+            padding: 2px var(--spacing-xs);
+            border-radius: 4px;
+            border: 1px solid var(--neutral-200);
+            text-align: left;
+            line-height: 1.1;
+            font-weight: 500;
+            color: var(--neutral-700);
+            white-space: nowrap;
+            box-shadow: var(--shadow-sm);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            min-width: 45px;
+        }
+        
+        .milestone-label::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent);
+            transition: left 0.5s ease;
+        }
+        
+        .milestone:hover .milestone-label::before {
+            left: 100%;
+        }
+        
+        .milestone:hover .milestone-label {
+            border-color: var(--primary-blue-light);
+            box-shadow: var(--shadow-lg);
+            transform: translateY(-2px);
+        }
+        
+        /* Status Indicators - Removed tick marks for cleaner look */
+        
+        /* Milestone Type Colors */
+        .milestone[data-type="ROJ-S"] .milestone-label,
+        .milestone[data-type="ROJ-F"] .milestone-label {
+            border-color: var(--milestone-planning);
+            background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+        }
+        
+        .milestone[data-type="MOB-S"] .milestone-label,
+        .milestone[data-type="MOB-F"] .milestone-label {
+            border-color: var(--milestone-execution);
+            background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+        }
+        
+        .milestone[data-type="EW-S"] .milestone-label,
+        .milestone[data-type="EW-F"] .milestone-label {
+            border-color: var(--milestone-execution);
+            background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+        }
+        
+        .milestone[data-type="FND-S"] .milestone-label,
+        .milestone[data-type="FND-F"] .milestone-label {
+            border-color: var(--milestone-foundation);
+            background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%);
+        }
+        
+        .milestone[data-type="PAD-S"] .milestone-label,
+        .milestone[data-type="PAD-F"] .milestone-label {
+            border-color: var(--milestone-review);
+            background: linear-gradient(135deg, #fed7aa 0%, #fdba74 100%);
+        }
+        
+        .milestone[data-type="SUP-S"] .milestone-label,
+        .milestone[data-type="SUP-F"] .milestone-label {
+            border-color: var(--milestone-structure);
+            background: linear-gradient(135deg, #cffafe 0%, #a5f3fc 100%);
+        }
+        
+        /* Loading animation */
+        .loading-spinner {
+            border: 3px solid var(--neutral-200);
+            border-top: 3px solid var(--primary-blue);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+                /* Legend */
+        .legend-container {
+            background: var(--neutral-50);
+            border-top: 2px solid var(--neutral-200);
+            padding: var(--spacing-md);
+        }
+        
+        .legend-header {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--neutral-800);
+            margin-bottom: var(--spacing-sm);
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-xs);
+        }
+        
+        .legend-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: var(--spacing-sm);
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-xs);
+            padding: var(--spacing-xs) var(--spacing-sm);
+            background: white;
+            border-radius: 6px;
+            border: 1px solid var(--neutral-200);
+            transition: all 0.2s ease;
+        }
+        
+        .legend-item:hover {
+            box-shadow: var(--shadow-md);
+            border-color: var(--primary-blue-light);
+        }
+        
+        .legend-icon {
+            font-size: 1rem;
+            width: 24px;
+            text-align: center;
+        }
+        
+        .legend-text {
+            font-size: 0.75rem;
+            color: var(--neutral-700);
+            font-weight: 500;
+        }
+        
+        /* Export Controls */
+        .export-controls {
+            background: white;
+            padding: var(--spacing-sm) var(--spacing-md);
+            border-top: 1px solid var(--neutral-200);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: var(--spacing-sm);
+        }
+        
+        .export-buttons {
+            display: flex;
+            gap: var(--spacing-sm);
+        }
+        
+        .export-btn {
+            padding: var(--spacing-xs) var(--spacing-sm);
+            border: 1px solid var(--neutral-300);
+            background: white;
+            color: var(--neutral-700);
+            border-radius: 6px;
+            font-weight: 500;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-xs);
+        }
+        
+        .export-btn:hover {
+            border-color: var(--primary-blue);
+            color: var(--primary-blue);
+            box-shadow: var(--shadow-sm);
+        }
+        
+        /* Tooltip Styles */
+        .tooltip {
+            position: absolute;
+            background: var(--neutral-900);
+            color: white;
+            padding: var(--spacing-sm) var(--spacing-md);
+            border-radius: 8px;
+            font-size: 0.75rem;
+            box-shadow: var(--shadow-xl);
+            z-index: 99999 !important;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+            max-width: 280px;
+            white-space: nowrap;
+            bottom: 100%;
+            left: 10px;
+            margin-bottom: 8px;
+        }
+        
+        .tooltip.visible {
+            opacity: 1;
+        }
+        
+        .tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 20px;
+            border: 6px solid transparent;
+            border-top-color: var(--neutral-900);
+        }
+        
+        /* Responsive Design */
+        @media (max-width: 1024px) {
+            .row-label, .timeline-labels {
+                width: 250px;
+            }
+            
+            .legend-grid {
+                grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .timeline-container {
+                border-radius: 8px;
+            }
+            
+            .row-label, .timeline-labels {
+                width: 200px;
+                padding: var(--spacing-xs) var(--spacing-sm);
+            }
+            
+            .project-name {
+                font-size: 0.8125rem;
+            }
+            
+            .project-date {
+                font-size: 0.6875rem;
+            }
+            
+            .timeline-row {
+                min-height: 50px;
+            }
+            
+            .timeline-content {
+                min-height: 50px;
+            }
+            
+            .milestone-icon {
+                font-size: 1.25rem;
+            }
+            
+            .legend-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .export-controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .export-buttons {
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans leading-normal tracking-normal">
+    <!-- Sidebar Toggle Button -->
+    <button class="sidebar-toggle">
+        <i class="fas fa-chevron-left"></i>
+    </button>
+    
+    <div class="flex h-screen bg-gray-100">
+        <!-- Sidebar -->
+        <div class="sidebar bg-blue-900 text-white flex flex-col h-screen expanded">
+            <div class="px-6 py-6">
+                <div class="flex items-center mb-6">
+                    <i class="fas fa-building mr-2 text-2xl"></i>
+                    <span class="text-xl font-bold nav-text">NIRMAN</span>
+                </div>
+                <p class="text-gray-400 text-xs uppercase tracking-wider mb-4 nav-label">Main Navigation</p>
+            </div>
+            
+            <div class="sidebar-nav overflow-y-auto flex-grow px-6" style="max-height: calc(100vh - 140px);">
+                <nav>
+                    <a href="settings.html" class="nav-link flex items-center py-2 px-4 rounded text-gray-300 hover:bg-blue-800 hover:text-white mb-2 transition-colors duration-200">
+                        <i class="fas fa-tachometer-alt mr-2"></i> 
+                        <span class="nav-text">Dashboard</span>
+                    </a>
+                    <a href="portfolio-management.html" class="nav-link flex items-center py-2 px-4 rounded bg-blue-800 text-white mb-2 transition-colors duration-200">
+                        <i class="fas fa-briefcase mr-2"></i> 
+                        <span class="nav-text">Portfolio Management</span>
+                    </a>
+                    <a href="compliance.html" class="nav-link flex items-center py-2 px-4 rounded text-gray-300 hover:bg-blue-800 hover:text-white mb-2 transition-colors duration-200">
+                        <i class="fas fa-shield-alt mr-2"></i> 
+                        <span class="nav-text">Compliance</span>
+                    </a>
+                    <a href="schedule.html" class="nav-link flex items-center py-2 px-4 rounded text-gray-300 hover:bg-blue-800 hover:text-white mb-2 transition-colors duration-200">
+                        <i class="fas fa-calendar mr-2"></i> 
+                        <span class="nav-text">Schedule Analytics (WBS)</span>
+                    </a>
+                    <a href="schedule_awp_fresh.html" class="nav-link flex items-center py-2 px-4 rounded text-gray-300 hover:bg-blue-800 hover:text-white mb-2 transition-colors duration-200">
+                        <i class="fas fa-tasks mr-2"></i> 
+                        <span class="nav-text">Schedule Analytics (AWP)</span>
+                    </a>
+                    <a href="schedule-drilldown.html" class="nav-link flex items-center py-2 px-4 rounded text-gray-300 hover:bg-blue-800 hover:text-white mb-2 transition-colors duration-200">
+                        <i class="fas fa-search-plus mr-2"></i> 
+                        <span class="nav-text">Schedule Drilldown</span>
+                    </a>
+                    <a href="3d-model.html" class="nav-link flex items-center py-2 px-4 rounded text-gray-300 hover:bg-blue-800 hover:text-white mb-2 transition-colors duration-200">
+                        <i class="fas fa-cube mr-2"></i> 
+                        <span class="nav-text">3D Model</span>
+                    </a>
+                    <a href="https://login-sandbox.procore.com/" target="_blank" class="nav-link flex items-center py-2 px-4 rounded text-gray-300 hover:bg-blue-800 hover:text-white mb-2 transition-colors duration-200">
+                        <i class="fas fa-external-link-alt mr-2"></i> 
+                        <span class="nav-text">Go to Procore</span>
+                    </a>
+                    <a href="version-history.html" class="nav-link flex items-center py-2 px-4 rounded text-gray-300 hover:bg-blue-800 hover:text-white mb-2 transition-colors duration-200">
+                        <i class="fas fa-history mr-2"></i> 
+                        <span class="nav-text">Version History</span>
+                    </a>
+                    <a href="upload.html" class="nav-link flex items-center py-2 px-4 rounded text-gray-300 hover:bg-blue-800 hover:text-white mb-2 transition-colors duration-200">
+                        <i class="fas fa-upload mr-2"></i> 
+                        <span class="nav-text">Insert to DB</span>
+                    </a>
+                    <a href="chat.html" class="nav-link flex items-center py-2 px-4 rounded text-gray-300 hover:bg-blue-800 hover:text-white mb-2 transition-colors duration-200">
+                        <i class="fas fa-comments mr-2"></i> 
+                        <span class="nav-text">Chat</span>
+                    </a>
+                </nav>
+            </div>
+            
+            <div class="px-6 py-6 mt-auto">
+                <a href="index.html" class="nav-link flex items-center py-2 px-4 rounded text-gray-300 hover:bg-blue-800 hover:text-white">
+                    <i class="fas fa-sign-out-alt mr-2"></i> 
+                    <span class="nav-text">Log Out</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content flex-1 overflow-hidden flex flex-col sidebar-expanded">
+            <!-- Top Navigation -->
+            <header class="bg-white shadow-sm">
+                <div class="flex items-center justify-between px-6 py-4">
+                    <div>
+                        <h1 class="text-2xl font-bold text-gray-800">Portfolio Management</h1>
+                        <p class="text-sm text-gray-600">Project milestone timeline visualization</p>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="text-sm text-gray-600 mr-4">
+                            <span class="font-medium">Portfolio:</span> <span id="totalProjects">Loading...</span>
+                        </div>
+                        <div class="flex items-center">
+                            <div class="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold mr-2">
+                                US
+                            </div>
+                            <span class="text-gray-800">User</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Filters, Legend and Export Controls -->
+                <div class="border-t border-gray-200 px-6 py-3 bg-gray-50">
+                    <!-- Filters Row -->
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center gap-4 flex-wrap">
+                            <div class="flex items-center">
+                                <label for="regionFilter" class="text-sm font-medium text-gray-700 mr-2">Region:</label>
+                                <select id="regionFilter" class="px-4 py-2 border border-gray-300 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Regions</option>
+                                </select>
+                            </div>
+                            <div class="flex items-center">
+                                <label for="projectFilter" class="text-sm font-medium text-gray-700 mr-2">Project:</label>
+                                <select id="projectFilter" class="px-4 py-2 border border-gray-300 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Projects</option>
+                                </select>
+                            </div>
+                            <div class="flex items-center">
+                                <label for="coloFilter" class="text-sm font-medium text-gray-700 mr-2">Colo:</label>
+                                <select id="coloFilter" class="px-4 py-2 border border-gray-300 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Colos</option>
+                                </select>
+                            </div>
+                            <div class="flex items-center">
+                                <label for="milestoneFilter" class="text-sm font-medium text-gray-700 mr-2">Milestone:</label>
+                                <div class="relative">
+                                    <button id="milestoneFilterBtn" class="px-4 py-2 border border-gray-300 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white min-w-40 text-left flex items-center justify-between">
+                                        <span id="milestoneFilterText">All Milestones</span>
+                                        <i class="fas fa-chevron-down ml-2"></i>
+                                    </button>
+                                    <div id="milestoneDropdown" class="absolute top-full left-0 mt-1 w-64 bg-white border border-gray-300 rounded-lg shadow-lg z-40 hidden max-h-60 overflow-y-auto">
+                                        <div class="p-3">
+                                            <div class="flex items-center justify-between mb-2">
+                                                <label class="flex items-center text-sm font-medium">
+                                                    <input type="checkbox" id="selectAllMilestones" class="mr-2">
+                                                    Select All
+                                                </label>
+                                                <button id="clearMilestones" class="text-xs text-blue-600 hover:text-blue-800">Clear</button>
+                                            </div>
+                                            <div id="milestoneCheckboxList" class="space-y-1">
+                                                <!-- Checkboxes will be populated here -->
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex items-center">
+                                <label for="driftFilter" class="text-sm font-medium text-gray-700 mr-2">Drift:</label>
+                                <select id="driftFilter" class="px-4 py-2 border border-gray-300 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All</option>
+                                    <option value="delay">Delayed Only</option>
+                                    <option value="early">Early Only</option>
+                                    <option value="no-drift">No Drift</option>
+                                </select>
+                            </div>
+                            <button id="applyFiltersBtn" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition-colors">
+                                <i class="fas fa-filter mr-1"></i> Apply Filters
+                            </button>
+                            <button id="resetFiltersBtn" class="bg-gray-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-600 transition-colors">
+                                <i class="fas fa-refresh mr-1"></i> Reset
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Legend and Export Row -->
+                    <div class="flex items-center justify-between">
+                        <!-- Legend Section -->
+                        <div class="flex items-center gap-4">
+                            <div class="text-sm font-medium text-gray-700">
+                                <i class="fas fa-info-circle mr-1"></i> Legend:
+                            </div>
+                            <div class="flex items-center gap-3 flex-wrap">
+                                <div class="flex items-center gap-1">
+                                    <span style="color: #3b82f6; font-weight: bold;">●</span>
+                                    <span class="text-xs text-gray-600">ROJ</span>
+                                </div>
+                                <div class="flex items-center gap-1">
+                                    <span style="color: #059669; font-weight: bold;">▲</span>
+                                    <span class="text-xs text-gray-600">MOB</span>
+                                </div>
+                                <div class="flex items-center gap-1">
+                                    <span style="color: #10b981; font-weight: bold;">■</span>
+                                    <span class="text-xs text-gray-600">EW</span>
+                                </div>
+                                <div class="flex items-center gap-1">
+                                    <span style="color: #8b5cf6; font-weight: bold;">◆</span>
+                                    <span class="text-xs text-gray-600">FND</span>
+                                </div>
+                                <div class="flex items-center gap-1">
+                                    <span style="color: #f97316; font-weight: bold;">◇</span>
+                                    <span class="text-xs text-gray-600">PAD</span>
+                                </div>
+                                <div class="flex items-center gap-1">
+                                    <span style="color: #06b6d4; font-weight: bold;">▣</span>
+                                    <span class="text-xs text-gray-600">SUP</span>
+                                </div>
+                                <div class="flex items-center gap-1">
+                                    <span style="color: #f59e0b; font-weight: bold;">▼</span>
+                                    <span class="text-xs text-gray-600">DRY</span>
+                                </div>
+                                <div class="border-l border-gray-300 mx-2 h-4"></div>
+                                <div class="flex items-center gap-1">
+                                    <span style="color: #ef4444; font-weight: bold;">---</span>
+                                    <span class="text-xs text-gray-600">Delay</span>
+                                </div>
+                                <div class="flex items-center gap-1">
+                                    <span style="color: #10b981; font-weight: bold;">---</span>
+                                    <span class="text-xs text-gray-600">Early</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Export Controls -->
+                        <div class="flex items-center gap-2">
+                            <div class="text-xs text-gray-500 mr-2">
+                                <i class="fas fa-clock mr-1"></i>
+                                <span id="lastUpdated">Loading...</span>
+                            </div>
+                            <button class="export-btn" onclick="exportToPDF()">
+                                <i class="fas fa-file-pdf"></i>
+                                PDF
+                            </button>
+                            <button class="export-btn" onclick="exportToExcel()">
+                                <i class="fas fa-file-excel"></i>
+                                Excel
+                            </button>
+                            <button class="export-btn" onclick="exportToImage()">
+                                <i class="fas fa-image"></i>
+                                Image
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Main Content -->
+            <main class="px-6 py-4 flex-1 overflow-hidden">
+                <!-- Loading State -->
+                <div id="loadingState" class="text-center py-8">
+                    <div class="loading-spinner"></div>
+                    <p class="text-gray-600 mt-4">Loading portfolio data...</p>
+                </div>
+
+                <!-- Error State -->
+                <div id="errorState" class="hidden bg-red-50 border border-red-200 rounded-lg p-6 mb-6">
+                    <div class="flex items-center">
+                        <i class="fas fa-exclamation-triangle text-red-500 text-xl mr-3"></i>
+                        <div>
+                            <h3 class="text-red-800 font-semibold">Error Loading Data</h3>
+                            <p class="text-red-600 text-sm mt-1" id="errorMessage"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Portfolio Timeline -->
+                <div id="portfolioContent" class="hidden h-full">
+                    <div class="timeline-container">
+                        <div class="timeline-header">
+                            <div class="timeline-labels">Project Timeline</div>
+                            <div class="timeline-scale" id="timelineScale">
+                                <!-- Dynamic scale will be inserted here -->
+                            </div>
+                        </div>
+                        
+                        <div class="timeline-body" id="timelineBody">
+                            <!-- Dynamic rows will be inserted here -->
+                        </div>
+                    </div>
+                    
+
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const API_BASE = 'http://localhost:3001'; // Server is running on port 3001
+        const MILESTONE_ICONS = {
+            'ROJ-S': '●', 'ROJ-F': '●',
+            'MOB-S': '▲', 'MOB-F': '▲',
+            'EW-S': '■', 'EW-F': '■',
+            'FND-S': '◆', 'FND-F': '◆',
+            'DRY-S': '▼', 'DRY-F': '▼',
+            'PAD-S': '◇', 'PAD-F': '◇',
+            'LSCX-S': '▲', 'LSCX-F': '▲',
+            'SUP-S': '▣', 'SUP-F': '▣',
+            'DEFAULT': '●'
+        };
+        
+        const MILESTONE_COLORS = {
+            'ROJ-S': '#3b82f6', 'ROJ-F': '#3b82f6',
+            'MOB-S': '#059669', 'MOB-F': '#059669',
+            'EW-S': '#10b981', 'EW-F': '#10b981',
+            'FND-S': '#8b5cf6', 'FND-F': '#8b5cf6',
+            'DRY-S': '#f59e0b', 'DRY-F': '#f59e0b',
+            'PAD-S': '#f97316', 'PAD-F': '#f97316',
+            'LSCX-S': '#059669', 'LSCX-F': '#059669',
+            'SUP-S': '#06b6d4', 'SUP-F': '#06b6d4',
+            'DEFAULT': '#6b7280'
+        };
+        
+        let portfolioData = [];
+        let businessProjects = [];
+        let filteredData = [];
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 Initializing Portfolio Management...');
+            initializeApp();
+        });
+
+        async function initializeApp() {
+            try {
+                await loadBusinessProjects();
+                await loadPortfolioData();
+                setupEventListeners();
+                renderPortfolio();
+            } catch (error) {
+                console.error('❌ Error initializing app:', error);
+                showError('Failed to initialize application: ' + error.message);
+            }
+        }
+
+        async function loadBusinessProjects() {
+            console.log('📊 Loading business projects...');
+            try {
+                const response = await fetch(`${API_BASE}/api/database/query`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: 'SELECT * FROM businessproject' })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                businessProjects = await response.json();
+                console.log(`✅ Loaded ${businessProjects.length} business projects`);
+            } catch (error) {
+                console.error('❌ Error loading business projects:', error);
+                console.log('⚠️ Continuing without business project data...');
+                businessProjects = []; // Set to empty array
+            }
+        }
+
+        async function loadPortfolioData() {
+            console.log('📈 Loading portfolio milestone data...');
+            try {
+                const response = await fetch(`${API_BASE}/api/database/query`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        query: 'SELECT * FROM ProjectMilestoneDetails_Optimized ORDER BY Project, Colo, days_from_first_milestone' 
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                portfolioData = await response.json();
+                console.log(`✅ Loaded ${portfolioData.length} milestone records`);
+                
+                if (portfolioData.length === 0) {
+                    throw new Error('No portfolio data found in ProjectMilestoneDetails_Optimized view');
+                }
+                
+                filteredData = [...portfolioData];
+                populateFilters();
+                updateTotalProjects();
+            } catch (error) {
+                console.error('❌ Error loading portfolio data:', error);
+                throw error;
+            }
+        }
+
+        function populateFilters() {
+            // Populate Region Filter using portfolioData directly
+            const regionFilter = document.getElementById('regionFilter');
+            const regions = [...new Set(portfolioData.map(item => item.region))].filter(Boolean).sort();
+            regionFilter.innerHTML = '<option value="">All Regions</option>';
+            regions.forEach(region => {
+                const option = document.createElement('option');
+                option.value = region;
+                option.textContent = region;
+                regionFilter.appendChild(option);
+            });
+            
+            // Populate Project Filter (initially all projects)
+            populateProjectFilter();
+            
+            // Populate Colo Filter
+            const coloFilter = document.getElementById('coloFilter');
+            const colos = [...new Set(portfolioData.map(item => item.colo))].sort();
+            coloFilter.innerHTML = '<option value="">All Colos</option>';
+            colos.forEach(colo => {
+                const option = document.createElement('option');
+                option.value = colo;
+                option.textContent = colo;
+                coloFilter.appendChild(option);
+            });
+            
+            // Populate Milestone Multi-Select Filter
+            populateMilestoneCheckboxes();
+            
+            console.log(`✅ Populated filters: ${regions.length} regions, ${colos.length} colos`);
+        }
+
+        function populateProjectFilter(selectedRegion = '') {
+            const projectFilter = document.getElementById('projectFilter');
+            
+            // Filter projects based on selected region
+            let projectsToShow = portfolioData;
+            if (selectedRegion) {
+                projectsToShow = portfolioData.filter(item => item.region === selectedRegion);
+            }
+            
+            const projects = [...new Set(projectsToShow.map(item => item.project))].sort();
+            const currentValue = projectFilter.value; // Preserve current selection if still valid
+            
+            projectFilter.innerHTML = '<option value="">All Projects</option>';
+            projects.forEach(project => {
+                const option = document.createElement('option');
+                option.value = project;
+                option.textContent = project;
+                projectFilter.appendChild(option);
+            });
+            
+            // Restore selection if it's still valid
+            if (currentValue && projects.includes(currentValue)) {
+                projectFilter.value = currentValue;
+            }
+            
+            console.log(`✅ Populated ${projects.length} projects for region: ${selectedRegion || 'All'}`);
+        }
+
+        function populateMilestoneCheckboxes() {
+            const milestoneCheckboxList = document.getElementById('milestoneCheckboxList');
+            const allMilestones = [...new Set(portfolioData.map(item => item.milestonetype).filter(Boolean))]; // Use lowercase field name from PostgreSQL
+            
+            // Club milestone types by removing -S/-F suffix
+            const clubbedMilestones = {};
+            allMilestones.forEach(milestone => {
+                if (milestone && typeof milestone === 'string') { // Additional safety check
+                    const baseType = milestone.replace(/-[SF]$/, ''); // Remove -S or -F suffix
+                    if (!clubbedMilestones[baseType]) {
+                        clubbedMilestones[baseType] = [];
+                    }
+                    clubbedMilestones[baseType].push(milestone);
+                }
+            });
+            
+            const sortedClubbed = Object.keys(clubbedMilestones).sort();
+            milestoneCheckboxList.innerHTML = '';
+            
+            sortedClubbed.forEach(baseType => {
+                const variants = clubbedMilestones[baseType];
+                const checkboxWrapper = document.createElement('label');
+                checkboxWrapper.className = 'flex items-center text-sm cursor-pointer hover:bg-gray-50 px-2 py-1 rounded';
+                
+                checkboxWrapper.innerHTML = `
+                    <input type="checkbox" value="${baseType}" class="milestone-checkbox mr-2" checked data-variants='${JSON.stringify(variants)}'>
+                    <span>${baseType} (${variants.length > 1 ? variants.join(', ') : variants[0]})</span>
+                `;
+                
+                milestoneCheckboxList.appendChild(checkboxWrapper);
+            });
+            
+            console.log(`✅ Populated ${sortedClubbed.length} clubbed milestone checkboxes`);
+        }
+
+        function updateTotalProjects() {
+            // Count unique Project-Colo combinations
+            const uniqueProjects = new Set(filteredData.map(item => `${item.project}|${item.colo}`));
+            document.getElementById('totalProjects').textContent = `${uniqueProjects.size} Project Groups (${filteredData.length} milestones)`;
+        }
+
+        function setupEventListeners() {
+            // Filter functionality
+            document.getElementById('applyFiltersBtn').addEventListener('click', applyFilters);
+            document.getElementById('resetFiltersBtn').addEventListener('click', resetFilters);
+            
+            // Special handler for region filter to update project dropdown
+            document.getElementById('regionFilter').addEventListener('change', (e) => {
+                const selectedRegion = e.target.value;
+                populateProjectFilter(selectedRegion);
+                applyFilters();
+            });
+            
+            document.getElementById('projectFilter').addEventListener('change', applyFilters);
+            document.getElementById('coloFilter').addEventListener('change', applyFilters);
+            document.getElementById('driftFilter').addEventListener('change', applyFilters);
+            
+            // Milestone multi-select dropdown
+            setupMilestoneDropdown();
+        }
+
+
+
+        function setupMilestoneDropdown() {
+            const dropdownBtn = document.getElementById('milestoneFilterBtn');
+            const dropdown = document.getElementById('milestoneDropdown');
+            const selectAllBtn = document.getElementById('selectAllMilestones');
+            const clearBtn = document.getElementById('clearMilestones');
+            
+            // Toggle dropdown
+            dropdownBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                dropdown.classList.toggle('hidden');
+            });
+            
+            // Close dropdown when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!dropdown.contains(e.target) && !dropdownBtn.contains(e.target)) {
+                    dropdown.classList.add('hidden');
+                }
+            });
+            
+            // Select All functionality
+            selectAllBtn.addEventListener('change', () => {
+                const checkboxes = dropdown.querySelectorAll('.milestone-checkbox');
+                checkboxes.forEach(checkbox => {
+                    checkbox.checked = selectAllBtn.checked;
+                });
+                updateMilestoneFilterText();
+                applyFilters();
+            });
+            
+            // Clear All functionality
+            clearBtn.addEventListener('click', () => {
+                const checkboxes = dropdown.querySelectorAll('.milestone-checkbox');
+                checkboxes.forEach(checkbox => {
+                    checkbox.checked = false;
+                });
+                selectAllBtn.checked = false;
+                updateMilestoneFilterText();
+                applyFilters();
+            });
+            
+            // Handle individual checkbox changes
+            dropdown.addEventListener('change', (e) => {
+                if (e.target.classList.contains('milestone-checkbox')) {
+                    updateSelectAllState();
+                    updateMilestoneFilterText();
+                    applyFilters();
+                }
+            });
+        }
+
+        function updateSelectAllState() {
+            const checkboxes = document.querySelectorAll('.milestone-checkbox');
+            const selectAllBtn = document.getElementById('selectAllMilestones');
+            const checkedCount = Array.from(checkboxes).filter(cb => cb.checked).length;
+            
+            if (checkedCount === 0) {
+                selectAllBtn.checked = false;
+                selectAllBtn.indeterminate = false;
+            } else if (checkedCount === checkboxes.length) {
+                selectAllBtn.checked = true;
+                selectAllBtn.indeterminate = false;
+            } else {
+                selectAllBtn.checked = false;
+                selectAllBtn.indeterminate = true;
+            }
+        }
+
+        function updateMilestoneFilterText() {
+            const checkboxes = document.querySelectorAll('.milestone-checkbox:checked');
+            const filterText = document.getElementById('milestoneFilterText');
+            
+            if (checkboxes.length === 0) {
+                filterText.textContent = 'No Milestones';
+            } else if (checkboxes.length === document.querySelectorAll('.milestone-checkbox').length) {
+                filterText.textContent = 'All Milestones';
+            } else if (checkboxes.length === 1) {
+                filterText.textContent = checkboxes[0].value;
+            } else {
+                filterText.textContent = `${checkboxes.length} Selected`;
+            }
+        }
+
+        function getSelectedMilestones() {
+            const checkboxes = document.querySelectorAll('.milestone-checkbox:checked');
+            const selectedMilestones = [];
+            
+            checkboxes.forEach(checkbox => {
+                const variants = JSON.parse(checkbox.dataset.variants || '[]');
+                selectedMilestones.push(...variants);
+            });
+            
+            return selectedMilestones;
+        }
+
+        function applyFilters() {
+            const regionFilter = document.getElementById('regionFilter').value;
+            const projectFilter = document.getElementById('projectFilter').value;
+            const coloFilter = document.getElementById('coloFilter').value;
+            const selectedMilestones = getSelectedMilestones();
+            const driftFilter = document.getElementById('driftFilter').value;
+            
+            console.log('🔍 Applying filters:', { 
+                region: regionFilter,
+                project: projectFilter, 
+                colo: coloFilter, 
+                milestones: selectedMilestones,
+                drift: driftFilter
+            });
+            
+            filteredData = portfolioData.filter(item => {
+                // Region filter - use direct region field from portfolioData
+                if (regionFilter && item.region !== regionFilter) return false;
+                
+                if (projectFilter && item.project !== projectFilter) return false;
+                if (coloFilter && item.colo !== coloFilter) return false;
+                if (selectedMilestones.length > 0 && !selectedMilestones.includes(item.milestonetype)) return false;
+                return true;
+            });
+            
+            // Apply drift filter if specified
+            if (driftFilter) {
+                filteredData = applyDriftFilter(filteredData, driftFilter);
+            }
+            
+            console.log(`✅ Filtered to ${filteredData.length} records`);
+            updateTotalProjects();
+            renderPortfolio();
+        }
+
+        function applyDriftFilter(data, driftFilter) {
+            // Group data to calculate drift
+            const groupedData = groupMilestonesByProjectColo(data);
+            const filteredItems = [];
+            
+            Object.keys(groupedData).forEach(groupKey => {
+                const group = groupedData[groupKey];
+                const baselineData = group.baseline;
+                const monthlyData = group.monthly;
+                
+                // Check each monthly milestone against baseline
+                monthlyData.forEach(monthlyItem => {
+                    const baselineItem = baselineData.find(b => 
+                        b.milestonetype === monthlyItem.milestonetype
+                    );
+                    
+                    if (baselineItem) {
+                        const baselineDays = parseFloat(baselineItem.days_from_first_milestone) || 0;
+                        const monthlyDays = parseFloat(monthlyItem.days_from_first_milestone) || 0;
+                        const drift = monthlyDays - baselineDays;
+                        
+                        const shouldInclude = 
+                            (driftFilter === 'delay' && drift > 1) ||
+                            (driftFilter === 'early' && drift < -1) ||
+                            (driftFilter === 'no-drift' && Math.abs(drift) <= 1);
+                        
+                        if (shouldInclude) {
+                            filteredItems.push(monthlyItem);
+                            // Also include the corresponding baseline item
+                            const baselineExists = filteredItems.find(item => 
+                                item.project === baselineItem.project && 
+                                item.colo === baselineItem.colo && 
+                                item.milestonetype === baselineItem.milestonetype &&
+                                item.file_type === baselineItem.file_type
+                            );
+                            if (!baselineExists) {
+                                filteredItems.push(baselineItem);
+                            }
+                        }
+                    } else if (driftFilter === 'no-drift') {
+                        // Include monthly items with no baseline (no drift)
+                        filteredItems.push(monthlyItem);
+                    }
+                });
+                
+                // For baseline items without corresponding monthly data
+                if (driftFilter === 'no-drift') {
+                    baselineData.forEach(baselineItem => {
+                        const monthlyExists = monthlyData.find(m => 
+                            m.milestonetype === baselineItem.milestonetype
+                        );
+                        if (!monthlyExists) {
+                            filteredItems.push(baselineItem);
+                        }
+                    });
+                }
+            });
+            
+            return filteredItems;
+        }
+
+        function resetFilters() {
+            document.getElementById('regionFilter').value = '';
+            document.getElementById('projectFilter').value = '';
+            document.getElementById('coloFilter').value = '';
+            document.getElementById('driftFilter').value = '';
+            
+            // Repopulate project dropdown to show all projects
+            populateProjectFilter();
+            
+            // Reset milestone checkboxes to all selected
+            const checkboxes = document.querySelectorAll('.milestone-checkbox');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = true;
+            });
+            document.getElementById('selectAllMilestones').checked = true;
+            document.getElementById('selectAllMilestones').indeterminate = false;
+            updateMilestoneFilterText();
+            
+            filteredData = [...portfolioData];
+            updateTotalProjects();
+            renderPortfolio();
+            console.log('🔄 Filters reset');
+        }
+
+        function renderPortfolio() {
+            console.log('🎨 Rendering portfolio timeline...');
+            hideLoading();
+            
+            if (filteredData.length === 0) {
+                showError('No data to display with current filters');
+                return;
+            }
+            
+            // Calculate timeline scale
+            const { maxDays, scaleMarks } = calculateTimelineScale();
+            
+            // Render timeline scale
+            renderTimelineScale(scaleMarks);
+            
+            // Render individual milestone rows
+            renderMilestoneRows(maxDays);
+            
+            // Show the portfolio content
+            document.getElementById('portfolioContent').classList.remove('hidden');
+        }
+
+        function renderMilestoneRows(maxDays) {
+            const timelineBody = document.getElementById('timelineBody');
+            timelineBody.innerHTML = '';
+            
+            // Group data by Project-Colo combination
+            const groupedData = groupMilestonesByProjectColo(filteredData);
+            
+            // Sort groups by Project name
+            const sortedGroups = Object.keys(groupedData).sort();
+            
+            sortedGroups.forEach(groupKey => {
+                const group = groupedData[groupKey];
+                const [project, colo] = groupKey.split('|');
+                
+                // Separate baseline and monthly data
+                const baselineData = group.baseline;
+                const monthlyData = group.monthly;
+                
+                // Create baseline row
+                const baselineRow = createMilestoneRow(
+                    project, 
+                    colo, 
+                    baselineData, 
+                    'Baseline Update', 
+                    maxDays,
+                    true // isBaseline
+                );
+                timelineBody.appendChild(baselineRow);
+                
+                // Create monthly row
+                const monthlyRow = createMilestoneRow(
+                    project, 
+                    colo, 
+                    monthlyData, 
+                    'Monthly Update', 
+                    maxDays,
+                    false, // isBaseline
+                    baselineData // for drift calculation
+                );
+                timelineBody.appendChild(monthlyRow);
+            });
+            
+            console.log(`✅ Rendered ${sortedGroups.length} project groups with baseline and monthly rows`);
+            
+            // Update last updated timestamp
+            updateLastUpdatedTime();
+        }
+
+        function groupMilestonesByProjectColo(data) {
+            const groups = {};
+            
+            data.forEach(item => {
+                const key = `${item.project}|${item.colo}`;
+                
+                if (!groups[key]) {
+                    groups[key] = {
+                        baseline: [],
+                        monthly: [],
+                        info: {
+                                                    project: item.project,
+                        colo: item.colo,
+                            region: item.region,
+                            file_type: item.file_type
+                        }
+                    };
+                }
+                
+                // Determine if this is baseline or monthly data based on file_type
+                if (item.file_type && item.file_type.toLowerCase().includes('baseline')) {
+                    groups[key].baseline.push(item);
+                } else {
+                    groups[key].monthly.push(item);
+                }
+            });
+            
+            return groups;
+        }
+
+        function createMilestoneRow(project, colo, milestones, rowType, maxDays, isBaseline, baselineData = null) {
+            const row = document.createElement('div');
+            row.className = 'timeline-row';
+            if (isBaseline) {
+                row.classList.add('baseline-row');
+            } else {
+                row.classList.add('monthly-row');
+            }
+            
+            // Project info section
+            const labelDiv = document.createElement('div');
+            labelDiv.className = 'row-label';
+            
+            if (milestones.length === 0 && isBaseline) {
+                // No baseline data available
+                labelDiv.innerHTML = `
+                    <div class="project-name">${project} | ${colo}</div>
+                    <div class="project-date no-baseline">No Baseline</div>
+                `;
+            } else {
+                const firstMilestone = milestones[0];
+                labelDiv.innerHTML = `
+                    <div class="project-name">${project} | ${colo}</div>
+                    <div class="project-date">${rowType}${firstMilestone ? ' | ' + formatDate(firstMilestone.datadate) : ''}</div>
+                `;
+            }
+            
+            // Timeline content section
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'timeline-content';
+            
+            // Add milestones for this row
+            milestones.forEach(item => {
+                const milestoneDiv = createMilestoneElement(item, maxDays);
+                contentDiv.appendChild(milestoneDiv);
+            });
+            
+            // Add drift lines if this is monthly row and we have baseline data
+            if (!isBaseline && baselineData && baselineData.length > 0) {
+                addDriftLines(contentDiv, milestones, baselineData, maxDays);
+            }
+            
+            row.appendChild(labelDiv);
+            row.appendChild(contentDiv);
+            return row;
+        }
+
+        function createMilestoneElement(item, maxDays) {
+            const milestoneDiv = document.createElement('div');
+            milestoneDiv.className = 'milestone';
+            
+            // Add data attributes for styling
+            milestoneDiv.setAttribute('data-type', item.milestonetype);
+            milestoneDiv.setAttribute('data-status', item.status);
+            
+            // Calculate position (percentage based on max days)
+            const daysFromFirst = parseFloat(item.days_from_first_milestone) || 0;
+            const position = (daysFromFirst / maxDays) * 100;
+            milestoneDiv.style.left = `${Math.min(position, 95)}%`; // Cap at 95% to keep visible
+            
+            // Get milestone icon and color
+            const iconKey = item.milestonetype.toUpperCase();
+            const icon = MILESTONE_ICONS[iconKey] || MILESTONE_ICONS.DEFAULT;
+            const color = MILESTONE_COLORS[iconKey] || MILESTONE_COLORS.DEFAULT;
+            
+            milestoneDiv.innerHTML = `
+                <div class="milestone-icon" style="color: ${color}">${icon}</div>
+                <span class="milestone-label">${item.milestonetype}<br/>${Math.round(daysFromFirst)}d</span>
+                                  <div class="tooltip">
+                      <strong>${item.milestones}</strong><br/>
+                      Status: ${item.status}<br/>
+                      Code: ${item.code}<br/>
+                      Start: ${formatDate(item.start_date)}<br/>
+                    Days from first: ${Math.round(daysFromFirst)}
+                </div>
+            `;
+            
+                            // Add hover handlers for tooltip
+                milestoneDiv.addEventListener('mouseenter', (e) => {
+                    const tooltip = milestoneDiv.querySelector('.tooltip');
+                    tooltip.classList.add('visible');
+                });
+                
+                milestoneDiv.addEventListener('mouseleave', (e) => {
+                    const tooltip = milestoneDiv.querySelector('.tooltip');
+                    tooltip.classList.remove('visible');
+                });
+            
+            // Add click handler
+            milestoneDiv.addEventListener('click', () => {
+                showMilestoneDetails(item);
+            });
+            
+            return milestoneDiv;
+        }
+
+        function addDriftLines(contentDiv, monthlyMilestones, baselineMilestones, maxDays) {
+            monthlyMilestones.forEach(monthlyItem => {
+                // Find corresponding baseline milestone (same milestone type)
+                const baselineItem = baselineMilestones.find(b => 
+                                            b.milestonetype === monthlyItem.milestonetype
+                );
+                
+                if (baselineItem) {
+                    const baselineDays = parseFloat(baselineItem.days_from_first_milestone) || 0;
+                    const monthlyDays = parseFloat(monthlyItem.days_from_first_milestone) || 0;
+                    const drift = monthlyDays - baselineDays;
+                    
+                    // Only show drift line if there's a significant difference (more than 1 day)
+                    if (Math.abs(drift) > 1) {
+                        const driftLine = createDriftLine(baselineDays, monthlyDays, drift, maxDays);
+                        contentDiv.appendChild(driftLine);
+                    }
+                }
+            });
+        }
+
+        function createDriftLine(baselineDays, monthlyDays, drift, maxDays) {
+            const driftLine = document.createElement('div');
+            driftLine.className = 'drift-line';
+            
+            const startPosition = (baselineDays / maxDays) * 100;
+            const endPosition = (monthlyDays / maxDays) * 100;
+            const lineLength = Math.abs(endPosition - startPosition);
+            
+            // Determine color based on drift direction
+            const color = drift > 0 ? '#ef4444' : '#10b981'; // Red for delay, Green for early
+            const direction = drift > 0 ? 'delayed' : 'early';
+            
+                         driftLine.style.cssText = `
+                 position: absolute;
+                 top: 45%;
+                 left: ${Math.min(startPosition, endPosition)}%;
+                 width: ${lineLength}%;
+                 height: 2px;
+                 background: transparent;
+                 border-top: 2px dashed ${color};
+                 z-index: 5;
+                 opacity: 0.8;
+             `;
+            
+            // Add arrow indicator
+            const arrow = document.createElement('div');
+            arrow.className = 'drift-arrow';
+            arrow.style.cssText = `
+                position: absolute;
+                top: -3px;
+                ${drift > 0 ? 'right: -6px' : 'left: -6px'};
+                width: 0;
+                height: 0;
+                border: 3px solid transparent;
+                ${drift > 0 ? `border-left: 6px solid ${color}` : `border-right: 6px solid ${color}`};
+            `;
+            
+            driftLine.appendChild(arrow);
+            
+            // Add drift tooltip
+            const driftTooltip = document.createElement('div');
+            driftTooltip.className = 'drift-tooltip';
+            driftTooltip.innerHTML = `
+                Drift: ${Math.abs(Math.round(drift))} days ${direction}<br/>
+                ${drift > 0 ? 'Schedule Delay' : 'Schedule Acceleration'}
+            `;
+                         driftTooltip.style.cssText = `
+                 position: absolute;
+                 top: -40px;
+                 left: 50%;
+                 transform: translateX(-50%);
+                 background: ${color};
+                 color: white;
+                 padding: 4px 8px;
+                 border-radius: 4px;
+                 font-size: 10px;
+                 white-space: nowrap;
+                 opacity: 0;
+                 pointer-events: none;
+                 transition: opacity 0.3s ease;
+                 z-index: 99999 !important;
+             `;
+            
+            driftLine.appendChild(driftTooltip);
+            
+                         // Show tooltip on hover
+             driftLine.addEventListener('mouseenter', () => {
+                 driftTooltip.style.opacity = '1';
+             });
+             
+             driftLine.addEventListener('mouseleave', () => {
+                 driftTooltip.style.opacity = '0';
+             });
+            
+            return driftLine;
+        }
+
+        function updateLastUpdatedTime() {
+            const now = new Date();
+            const timestamp = now.toLocaleString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            document.getElementById('lastUpdated').textContent = timestamp;
+        }
+
+        function calculateTimelineScale() {
+            const allDays = filteredData.map(item => parseFloat(item.days_from_first_milestone) || 0);
+            const maxDays = Math.max(...allDays, 800); // Minimum 800 days for reasonable scale
+            const minDays = Math.min(...allDays, 0);
+            
+            // Create scale marks every 100 days
+            const scaleMarks = [];
+            for (let i = Math.floor(minDays / 100) * 100; i <= Math.ceil(maxDays / 100) * 100; i += 100) {
+                scaleMarks.push(i);
+            }
+            
+            return { maxDays, scaleMarks, minDays };
+        }
+
+        function renderTimelineScale(scaleMarks) {
+            const scaleContainer = document.getElementById('timelineScale');
+            scaleContainer.innerHTML = '';
+            
+            // Get the same maxDays calculation used for milestones
+            const { maxDays } = calculateTimelineScale();
+            
+            scaleMarks.forEach(mark => {
+                const span = document.createElement('span');
+                span.textContent = `${mark}d`;
+                span.className = 'scale-mark';
+                span.style.position = 'absolute';
+                
+                // Use EXACT same calculation as milestones
+                const position = (mark / maxDays) * 100;
+                span.style.left = `${Math.min(position, 95)}%`;
+                span.style.transform = 'translateX(-50%)';
+                
+                scaleContainer.appendChild(span);
+            });
+        }
+
+
+
+        function showMilestoneDetails(item) {
+                          const details = `
+                  Milestone: ${item.milestones}
+                                     Type: ${item.milestonetype}
+                  Code: ${item.code}
+                                     Project: ${item.project}-${item.colo}
+                  Status: ${item.status}
+                  Days from Start: ${Math.round(parseFloat(item.days_from_first_milestone) || 0)}
+                  Start Date: ${formatDate(item.start_date)}
+                  End Date: ${formatDate(item.end_date)}
+                File Type: ${item.file_type}
+                Region: ${item.region}
+                Data Date: ${formatDate(item.datadate)}
+            `;
+            alert(details);
+        }
+
+        function formatDate(dateString) {
+            if (!dateString) return 'N/A';
+            try {
+                const date = new Date(dateString);
+                return date.toLocaleDateString('en-US', { 
+                    year: 'numeric', 
+                    month: 'short', 
+                    day: 'numeric' 
+                });
+            } catch (error) {
+                return dateString;
+            }
+        }
+
+        function showError(message) {
+            document.getElementById('loadingState').classList.add('hidden');
+            document.getElementById('portfolioContent').classList.add('hidden');
+            document.getElementById('errorState').classList.remove('hidden');
+            document.getElementById('errorMessage').textContent = message;
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingState').classList.add('hidden');
+            document.getElementById('errorState').classList.add('hidden');
+        }
+
+        // Export Functions
+        function exportToPDF() {
+            // Create a simplified version for PDF export
+            const printWindow = window.open('', '_blank');
+            const timelineContainer = document.querySelector('.timeline-container').cloneNode(true);
+            
+            // Remove interactive elements for print
+            timelineContainer.querySelectorAll('.milestone').forEach(milestone => {
+                milestone.style.cursor = 'default';
+                milestone.onclick = null;
+            });
+            
+            printWindow.document.write(`
+                <html>
+                <head>
+                    <title>Portfolio Management Timeline - ${new Date().toLocaleDateString()}</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; margin: 20px; }
+                        .timeline-container { width: 100%; }
+                        .timeline-header { background: #1e40af !important; color: white; padding: 20px; }
+                        .timeline-row { display: flex; border-bottom: 1px solid #e2e8f0; min-height: 60px; }
+                        .row-label { width: 300px; padding: 10px; border-right: 1px solid #e2e8f0; }
+                        .timeline-content { flex: 1; position: relative; padding: 10px; }
+                        .milestone { position: absolute; top: 20px; display: flex; align-items: center; }
+                        .milestone-icon { font-size: 16px; margin-right: 5px; }
+                        .milestone-label { font-size: 10px; background: white; padding: 2px 4px; border: 1px solid #ccc; }
+                        .project-name { font-weight: bold; font-size: 12px; }
+                        .project-date { font-size: 10px; color: #666; }
+                        @media print { body { margin: 0; } }
+                    </style>
+                </head>
+                <body>
+                    <h1>Portfolio Management Timeline</h1>
+                    <p>Generated on: ${new Date().toLocaleString()}</p>
+                    ${timelineContainer.outerHTML}
+                </body>
+                </html>
+            `);
+            
+            printWindow.document.close();
+            setTimeout(() => {
+                printWindow.print();
+                printWindow.close();
+            }, 250);
+        }
+
+        function exportToExcel() {
+            // Convert filtered data to CSV format
+            const headers = ['Project', 'Colo', 'Code', 'Milestone', 'Type', 'Status', 'Start Date', 'End Date', 'Days from First', 'Region', 'File Type', 'Data Date'];
+            const csvData = [headers.join(',')];
+            
+            filteredData.forEach(item => {
+                                  const row = [
+                                     item.project,
+                 item.colo,
+                      item.code,
+                      `"${item.milestones}"`,
+                     item.milestonetype,
+                      item.status,
+                      item.start_date,
+                      item.end_date,
+                    item.days_from_first_milestone,
+                    item.region,
+                    item.file_type,
+                    item.datadate
+                ];
+                csvData.push(row.join(','));
+            });
+            
+            const csvContent = csvData.join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `portfolio_timeline_${new Date().toISOString().split('T')[0]}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function exportToImage() {
+            // Use html2canvas library if available, otherwise provide instructions
+            if (typeof html2canvas !== 'undefined') {
+                const element = document.querySelector('.timeline-container');
+                html2canvas(element, {
+                    backgroundColor: '#ffffff',
+                    scale: 2
+                }).then(canvas => {
+                    const link = document.createElement('a');
+                    link.download = `portfolio_timeline_${new Date().toISOString().split('T')[0]}.png`;
+                    link.href = canvas.toDataURL();
+                    link.click();
+                });
+            } else {
+                alert('Image export requires html2canvas library. Please use the PDF export option instead.');
+            }
+        }
+
+        // Navigation functions
+        document.querySelectorAll('.sidebar-nav a').forEach(link => {
+            link.addEventListener('click', function(e) {
+                if (this.href && !this.href.includes('#') && !this.target) {
+                    e.preventDefault();
+                    window.location.href = this.href;
+                }
+            });
+        });
+    </script>
+    
+    <!-- Sidebar functionality script -->
+    <script src="js/sidebar.js"></script>
+</body>
+</html> 

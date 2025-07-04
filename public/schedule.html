@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Schedule Analytics - Tool Name</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="dashboard.css">
+    <link rel="stylesheet" href="css/sidebar.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- D3.js for Gantt Chart and Force-Directed Graph -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script type="module" src="schedule.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dayjs@1.10.7/dayjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dayjs@1.10.7/plugin/advancedFormat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@2.0.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+    <script type="module" src="js/modules/gantt-client.js"></script>
+    
+
+    
+    <style>
+        /* D3 Gantt Chart styling */
+        .gantt-container {
+            height: auto !important;
+            min-height: 400px;
+            max-height: 80vh;
+            width: 100%;
+            overflow: auto;
+            position: relative;
+        }
+        
+        #d3GanttChart {
+            width: 100%;
+            height: auto;
+            min-height: 400px;
+            position: relative;
+            overflow: visible;
+        }
+        
+        .gantt-svg {
+            display: block;
+            width: 100%;
+        }
+        
+        /* Ensure parent containers expand to fit content */
+        #ganttTabPanel {
+            height: auto !important;
+            min-height: 400px;
+            display: flex;
+            flex-direction: column;
+            overflow: auto;
+        }
+        
+        /* Make expand/collapse buttons more visible */
+        .expand-collapse-btn {
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .expand-collapse-btn:hover {
+            fill: #c0c0c0;
+        }
+
+        .limit-controls {
+            display: none; /* Hidden by default, will show after loading */
+            margin-bottom: 10px;
+        }
+        
+        /* Task styling */
+        .gantt-task-bar {
+            cursor: pointer;
+            fill-opacity: 0.8;
+            stroke-width: 1;
+        }
+        .gantt-task-bar:hover {
+            fill-opacity: 1;
+            stroke-width: 2;
+        }
+        .gantt-milestone {
+            fill: #9932CC;
+            stroke: #7B2B9D;
+        }
+        .gantt-project {
+            fill: #3498DB;
+            stroke: #2471A3;
+        }
+        .gantt-task {
+            fill: #2ECC71;
+            stroke: #239B56;
+        }
+        .gantt-critical {
+            fill: #E74C3C;
+            stroke: #C0392B;
+        }
+        
+        /* Grid styling */
+        .gantt-grid line {
+            stroke: #E5E7EB;
+        }
+        .gantt-grid-major line {
+            stroke: #D1D5DB;
+        }
+        .gantt-axis text {
+            font-size: 10px;
+            fill: #6B7280;
+        }
+        .gantt-axis-x .tick line {
+            stroke: #D1D5DB;
+        }
+        .gantt-axis-y .tick line {
+            stroke: #D1D5DB;
+        }
+        
+        /* Force-directed graph styling */
+        #criticalPathGraph {
+            position: relative;
+            height: 400px;
+            width: 100%;
+            margin-bottom: 30px;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+            background-color: #f9fafb;
+        }
+        .graph-node {
+            fill: #ef4444;
+            stroke: #dc2626;
+            stroke-width: 2px;
+            cursor: pointer;
+            transition: opacity 0.3s;
+        }
+        .graph-node:hover {
+            stroke-width: 3px;
+            stroke: #b91c1c;
+        }
+        .graph-link {
+            stroke: #dc2626;
+            stroke-opacity: 0.6;
+            stroke-width: 2px;
+            pointer-events: all;
+            /* Ensure links are visible */
+            fill: none;
+            stroke-linecap: round;
+        }
+        .graph-tooltip {
+            position: absolute;
+            padding: 8px;
+            background: rgba(0, 0, 0, 0.8);
+            color: #fff;
+            border-radius: 4px;
+            font-size: 12px;
+            pointer-events: none;
+            z-index: 1000;
+            max-width: 250px;
+        }
+        .highlighted {
+            stroke-width: 4px !important;
+            stroke: #f97316 !important;
+        }
+        .highlighted-link {
+            stroke-width: 3px !important;
+            stroke-opacity: 1 !important;
+            stroke: #f97316 !important;
+        }
+        .dimmed {
+            opacity: 0.2;
+        }
+        
+        /* Make data table more compact */
+        #ganttDataTable th, #ganttDataTable td {
+            padding: 6px 8px;
+            white-space: nowrap;
+        }
+        #ganttDataTable th {
+            background-color: #f3f4f6;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+        /* WBS Row styling */
+        .wbs-row {
+            background-color: #f3f4f6;
+            font-weight: 600;
+        }
+        /* Critical task styling */
+        .critical-row {
+            color: #e53e3e;
+        }
+        /* Ensure Gantt chart takes priority height */
+        #ganttDataTable {
+            flex-grow: 0;
+            flex-shrink: 0;
+            max-height: 250px;
+        }
+        #ganttDataTable > div {
+            overflow-x: auto;
+            overflow-y: hidden;
+            height: 100%;
+        }
+        #ganttDataTable table {
+            width: auto;
+        }
+        /* Ensure full-height layout */
+        .flex-1 {
+            display: flex;
+            flex-direction: column;
+        }
+        main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        main > div {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        main > div > div:nth-child(2) {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        #cpmTableTabPanel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        #cpmSection {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        /* Media queries for responsive font sizes */
+        @media (max-width: 768px) {
+            .pagination-controls button {
+                font-size: 0.75rem;
+                padding: 0.25rem 0.5rem;
+            }
+        }
+        
+        /* Float Analysis specific styles */
+        #floatAnalysisTabPanel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #floatAnalysisTabPanel.active {
+            display: flex;
+            flex-direction: column;
+            overflow: auto;
+            visibility: visible;
+        }
+
+        /* Make sure charts are visible */
+        #floatAnalysisChart {
+            width: 100% !important;
+            height: 100% !important;
+            max-height: 250px;
+        }
+
+        /* Ensure table rows are visible */
+        #floatAnalysisTable td {
+            padding: 0.5rem;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        /* Critical priority: fix heights and overflow */
+        #floatAnalysisTabPanel > div {
+            min-height: 0; /* Critical for proper flexbox behavior */
+            flex-shrink: 1;
+            overflow: visible;
+        }
+    </style>
+    <style>
+/* Float Analysis Tab Styles */
+#floatAnalysisTabPanel.active {
+    display: flex;
+    flex-direction: column;
+    overflow: auto;
+    visibility: visible;
+}
+
+#floatAnalysisTable {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+#floatAnalysisTable thead tr th {
+    position: sticky;
+    top: 0;
+    background-color: #f3f4f6;
+    z-index: 10;
+    padding: 8px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+#floatAnalysisTable tbody tr td {
+    padding: 8px;
+    border-bottom: 1px solid #e5e7eb;
+        }
+
+        /* Tab panel styling */
+        .tab-panel {
+            width: 100%;
+            height: 100%;
+            flex: 1;
+        }
+        
+        .tab-panel.active {
+            display: flex !important;
+            flex-direction: column;
+        }
+        
+        .tab-panel:not(.active) {
+            display: none !important;
+        }
+
+#floatAnalysisVisual {
+    height: 300px !important;
+    width: 100% !important;
+    min-height: 250px;
+    margin-bottom: 16px;
+    position: relative;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    background-color: #ffffff;
+}
+    </style>
+</head>
+<body class="bg-gray-100 font-sans leading-normal tracking-normal">
+    <!-- Sidebar Toggle Button -->
+    <button class="sidebar-toggle">
+        <i class="fas fa-chevron-left"></i>
+    </button>
+    
+    <div class="flex h-screen bg-gray-100">
+        <!-- Sidebar -->
+        <div class="sidebar bg-blue-900 text-white flex flex-col h-screen expanded">
+            <div class="px-6 py-6">
+                <div class="flex items-center mb-6">
+                    <i class="fas fa-building mr-2 text-2xl"></i>
+                    <span class="text-xl font-bold nav-text">NIRMAN</span>
+                </div>
+                <p class="text-gray-400 text-xs uppercase tracking-wider mb-4 nav-label">Main Navigation</p>
+            </div>
+            
+            <div class="sidebar-nav overflow-y-auto flex-grow px-6" style="max-height: calc(100vh - 140px);">
+                <nav>
+                    <a href="settings.html" class="nav-link flex items-center py-2 px-4 rounded text-gray-300 hover:bg-blue-800 hover:text-white mb-2 transition-colors duration-200">
+                        <i class="fas fa-tachometer-alt mr-2"></i> 
+                        <span class="nav-text">Dashboard</span>
+                    </a>
+                    <a href="portfolio-management.html" class="nav-link flex items-center py-2 px-4 rounded text-gray-300 hover:bg-blue-800 hover:text-white mb-2 transition-colors duration-200">
+                        <i class="fas fa-briefcase mr-2"></i> 
+                        <span class="nav-text">Portfolio Management</span>
+                    </a>
+                    <a href="compliance.html" class="nav-link flex items-center py-2 px-4 rounded text-gray-300 hover:bg-blue-800 hover:text-white mb-2 transition-colors duration-200">
+                        <i class="fas fa-shield-alt mr-2"></i> 
+                        <span class="nav-text">Compliance</span>
+                    </a>
+                    <a href="schedule.html" class="nav-link flex items-center py-2 px-4 rounded bg-blue-800 text-white mb-2 transition-colors duration-200">
+                        <i class="fas fa-calendar mr-2"></i> 
+                        <span class="nav-text">Schedule Analytics (WBS)</span>
+                    </a>
+                    <a href="schedule_awp_fresh.html" class="nav-link flex items-center py-2 px-4 rounded text-gray-300 hover:bg-blue-800 hover:text-white mb-2 transition-colors duration-200">
+                        <i class="fas fa-tasks mr-2"></i> 
+                        <span class="nav-text">Schedule Analytics (AWP)</span>
+                    </a>
+                    <a href="schedule-drilldown.html" class="nav-link flex items-center py-2 px-4 rounded text-gray-300 hover:bg-blue-800 hover:text-white mb-2 transition-colors duration-200">
+                        <i class="fas fa-search-plus mr-2"></i> 
+                        <span class="nav-text">Schedule Drilldown</span>
+                    </a>
+                    <a href="3d-model.html" class="nav-link flex items-center py-2 px-4 rounded text-gray-300 hover:bg-blue-800 hover:text-white mb-2 transition-colors duration-200">
+                        <i class="fas fa-cube mr-2"></i> 
+                        <span class="nav-text">3D Model</span>
+                    </a>
+                    <a href="https://login-sandbox.procore.com/" target="_blank" class="nav-link flex items-center py-2 px-4 rounded text-gray-300 hover:bg-blue-800 hover:text-white mb-2 transition-colors duration-200">
+                        <i class="fas fa-external-link-alt mr-2"></i> 
+                        <span class="nav-text">Go to Procore</span>
+                    </a>
+                    <a href="version-history.html" class="nav-link flex items-center py-2 px-4 rounded text-gray-300 hover:bg-blue-800 hover:text-white mb-2 transition-colors duration-200">
+                        <i class="fas fa-history mr-2"></i> 
+                        <span class="nav-text">Version History</span>
+                    </a>
+                    <a href="upload.html" class="nav-link flex items-center py-2 px-4 rounded text-gray-300 hover:bg-blue-800 hover:text-white mb-2 transition-colors duration-200">
+                        <i class="fas fa-upload mr-2"></i> 
+                        <span class="nav-text">Insert to DB</span>
+                    </a>
+                    <a href="chat.html" class="nav-link flex items-center py-2 px-4 rounded text-gray-300 hover:bg-blue-800 hover:text-white mb-2 transition-colors duration-200">
+                        <i class="fas fa-comments mr-2"></i> 
+                        <span class="nav-text">Chat</span>
+                    </a>
+                    
+                    <!-- WBS links will appear here when loaded -->
+                    <div id="wbsNavigationLinks"></div>
+                    
+                    <!-- Show more/less toggle -->
+                    <div class="wbs-toggle nav-text" id="wbsToggle" style="display: none;">Show More</div>
+                </nav>
+            </div>
+            
+            <div class="px-6 py-6 mt-auto">
+                <a href="index.html" class="nav-link flex items-center py-2 px-4 rounded text-gray-300 hover:bg-blue-800 hover:text-white transition-colors duration-200">
+                    <i class="fas fa-sign-out-alt mr-2"></i> 
+                    <span class="nav-text">Log Out</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content flex-1 overflow-x-hidden overflow-y-auto flex flex-col sidebar-expanded">
+            <!-- Top Navigation -->
+            <header class="bg-white shadow-sm">
+                 <div class="flex items-center justify-between px-6 py-4">
+                    <div>
+                         <h1 class="text-2xl md:text-3xl font-bold text-gray-800">Schedule Analytics</h1>
+                         <p class="text-sm md:text-base text-gray-600">Analyze project schedule data</p>
+                    </div>
+                     <div class="flex items-center text-sm md:text-base">
+                        <div class="text-gray-600 mr-4">
+                            <span class="font-medium">Project ID:</span> <span id="currentProjectId">N/A</span>
+                        </div>
+                        <div class="flex items-center">
+                            <div class="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold mr-2">
+                                US
+                            </div>
+                            <span class="text-gray-800">User</span>
+                        </div>
+                    </div>
+                </div>
+                 <!-- Project Filter -->
+                <div class="border-t border-gray-200 px-6 py-3 bg-gray-50 project-filter-container">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <label for="projectFilter" class="text-sm md:text-base font-medium text-gray-700 mr-2">Project:</label>
+                            <select id="projectFilter" class="px-4 py-2 border border-gray-300 rounded-lg text-sm md:text-base shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                <option value="">Select a project...</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Add limit control that will be shown after Gantt loads -->
+                        <div id="limitControls" class="limit-controls flex items-center">
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Main Content Area -->
+            <main class="p-6 flex-1 flex flex-col">
+                <!-- Tab Navigation and Content Area -->
+                <div class="flex flex-col flex-1"> 
+                    <div class="flex items-center border-b border-gray-200 mb-4">
+                        <!-- Tab Buttons -->
+                        <nav class="flex space-x-1 md:space-x-2 flex-wrap">
+                            <button id="ganttTabBtn" class="tab-button py-2 px-3 md:px-4 border-b-2 border-blue-600 text-blue-600 font-medium focus:outline-none text-sm md:text-base">Gantt View</button>
+                            <button id="floatAnalysisTabBtn" class="tab-button py-2 px-3 md:px-4 text-gray-500 hover:text-gray-700 hover:border-gray-300 focus:outline-none text-sm md:text-base">Float Analysis</button>
+                        </nav>
+                    </div>
+
+                    <!-- Tab Panels -->
+                    <div class="flex-1 flex flex-col relative" style="min-height: 75vh;">
+                        <!-- Gantt Chart Panel -->
+                        <div id="ganttTabPanel" class="tab-panel active">
+                            <!-- Task Count Display -->
+                            <div class="mb-3 px-4 py-2 bg-gray-50 rounded-lg border">
+                                <div class="flex items-center justify-between text-sm">
+                                    <div class="text-gray-700">
+                                        <span class="font-medium">Showing:</span> 
+                                        <span id="visibleTaskCount" class="font-semibold text-blue-600">0</span> tasks
+                                    </div>
+                                    <div class="text-gray-500">
+                                        <span class="font-medium">Total in project:</span> 
+                                        <span id="totalTaskCount" class="font-semibold">0</span> tasks
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Add WBS Filter -->
+                            <div class="flex items-center mb-4">
+                                <label for="wbsLevelFilter" class="mr-2 font-medium text-gray-700">Filter by WBS Level:</label>
+                                <select id="wbsLevelFilter" class="px-3 py-1 border border-gray-300 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500">
+                                    <option value="all">All Tasks</option>
+                                    <!-- Options will be populated dynamically -->
+                                </select>
+                                
+                                <label for="lookaheadFilter" class="ml-6 mr-2 font-medium text-gray-700">Lookahead:</label>
+                                <select id="lookaheadFilter" class="px-3 py-1 border border-gray-300 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 mr-2">
+                                    <option value="30">Next 30 Days</option>
+                                    <option value="60">Next 60 Days</option>
+                                    <option value="90" selected>Next 90 Days</option>
+                                    <option value="180">Next 6 Months</option>
+                                    <option value="365">Next Year</option>
+                                    <option value="all">All Future Tasks</option>
+                                </select>
+                                
+                                <label class="flex items-center mr-4">
+                                    <input type="checkbox" id="showPastTasks" class="mr-1" />
+                                    <span class="text-sm text-gray-700">Include Past</span>
+                                </label>
+                                
+                                <button id="showDependencies" class="px-3 py-1 bg-blue-100 text-blue-700 border border-blue-300 rounded text-sm hover:bg-blue-200 mr-4">Show Dependencies</button>
+                                
+                                <button id="applyFilters" class="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">Apply</button>
+                            </div>
+                            
+                            <!-- Resizable task table and Gantt chart layout -->
+                            <div class="content-container" style="display: flex; height: calc(75vh - 100px); border: 1px solid #ddd; border-radius: 0.375rem; overflow: hidden;">
+                                <!-- Resizable task table -->
+                                <div class="task-table-container" id="taskTableContainer" style="width: 50%; min-width: 400px; max-width: 70%; border-right: 1px solid #ddd; overflow: hidden; display: flex; flex-direction: column;">
+                                    <!-- Single table with fixed header -->
+                                    <div class="table-wrapper" style="flex: 1; overflow: auto; position: relative;">
+                                        <table style="width: 100%; table-layout: fixed; border-collapse: collapse; min-width: 900px;">
+                                            <thead style="position: sticky; top: 0; z-index: 10; background: #f8f9fa;">
+                                                <tr>
+                                                    <th style="width: 80px; padding: 8px; text-align: left; font-weight: 600; font-size: 0.875rem; color: #374151; border-right: 1px solid #e5e7eb; border-bottom: 1px solid #ddd; resize: horizontal; overflow: auto;">WBS</th>
+                                                    <th style="width: 350px; padding: 8px; text-align: left; font-weight: 600; font-size: 0.875rem; color: #374151; border-right: 1px solid #e5e7eb; border-bottom: 1px solid #ddd; resize: horizontal; overflow: auto;">Task Name</th>
+                                                    <th style="width: 120px; padding: 8px; text-align: left; font-weight: 600; font-size: 0.875rem; color: #374151; border-right: 1px solid #e5e7eb; border-bottom: 1px solid #ddd; resize: horizontal; overflow: auto;">Start</th>
+                                                    <th style="width: 120px; padding: 8px; text-align: left; font-weight: 600; font-size: 0.875rem; color: #374151; border-right: 1px solid #e5e7eb; border-bottom: 1px solid #ddd; resize: horizontal; overflow: auto;">Finish</th>
+                                                    <th style="width: 80px; padding: 8px; text-align: left; font-weight: 600; font-size: 0.875rem; color: #374151; border-right: 1px solid #e5e7eb; border-bottom: 1px solid #ddd; resize: horizontal; overflow: auto;">Duration</th>
+                                                    <th style="width: 80px; padding: 8px; text-align: left; font-weight: 600; font-size: 0.875rem; color: #374151; border-right: 1px solid #e5e7eb; border-bottom: 1px solid #ddd; resize: horizontal; overflow: auto;">% Complete</th>
+                                                    <th style="width: 60px; padding: 8px; text-align: left; font-weight: 600; font-size: 0.875rem; color: #374151; border-bottom: 1px solid #ddd; resize: horizontal; overflow: auto;">Seq</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="task-table-body" style="background: white;">
+                                                <tr>
+                                                    <td colspan="7" style="padding: 16px; text-align: center; color: #6b7280;">Loading tasks...</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <!-- Resize handle -->
+                                <div class="resize-handle" id="resizeHandle" style="width: 5px; background: #e5e7eb; cursor: col-resize; position: relative; z-index: 1;">
+                                    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 3px; height: 30px; background: #9ca3af; border-radius: 2px;"></div>
+                                </div>
+                                
+                                <!-- Gantt chart area -->
+                                <div class="timeline-container" style="flex: 1; overflow: hidden; display: flex; flex-direction: column;">
+                                    <!-- Timeline header -->
+                                    <div id="timeline-header-container" style="background: #f8f9fa; border-bottom: 1px solid #ddd; overflow: hidden;">
+                                        <div id="timelineHeader" style="position: relative;">
+                                            <div class="month-headers" style="display: flex; height: 25px; border-bottom: 1px solid #ddd;"></div>
+                                            <div class="day-headers" style="display: flex; height: 25px;"></div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Timeline area with scroll -->
+                                    <div id="timeline-area-container" style="flex: 1; overflow: auto; position: relative; background: white;">
+                                        <div id="timelineArea" style="position: relative; height: 100%;">
+                                            <div id="ganttBars" style="position: relative; width: 100%; height: 100%;"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Float Analysis Panel -->
+                        <div id="floatAnalysisTabPanel" class="tab-panel bg-white p-4 rounded-lg shadow" style="height: 75vh; display: none; flex-direction: column;">
+                            <!-- Div for Visual Chart -->
+                            <div id="floatAnalysisVisual"></div>
+
+                            <!-- Filter Status Display -->
+                            <div id="filterStatus" class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded hidden">
+                                <span id="filterText" class="text-blue-800">Showing all tasks</span>
+                                <button id="clearFilterBtn" class="ml-4 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm">
+                                    Clear Filter
+                                </button>
+                            </div>
+
+                            <!-- Div for Table (Remaining height) -->
+                            <div id="floatAnalysisTableContainer" style="flex-grow: 1; overflow: auto;">
+                                <table id="floatAnalysisTable" class="min-w-full divide-y divide-gray-200 text-sm border-collapse">
+                                            <thead>
+                                        <tr class="bg-gray-50">
+                                            <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider sticky top-0 bg-gray-50 z-10 border-b">TASK Name</th>
+                                            <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider sticky top-0 bg-gray-50 z-10 border-b">Total Float</th>
+                                            <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider sticky top-0 bg-gray-50 z-10 border-b">Status</th>
+                                            <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider sticky top-0 bg-gray-50 z-10 border-b">Actual Start</th>
+                                            <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider sticky top-0 bg-gray-50 z-10 border-b">Actual End</th>
+                                            <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider sticky top-0 bg-gray-50 z-10 border-b">Target Start</th>
+                                            <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider sticky top-0 bg-gray-50 z-10 border-b">Target End</th>
+                                        </tr>
+                                            </thead>
+                                            <tbody>
+                                        <!-- Table rows will be populated by JavaScript -->
+                                            </tbody>
+                                        </table>
+
+                                <!-- Pagination Controls -->
+                                <div class="pagination-controls flex justify-center items-center mt-4">
+                                    <button id="prevPage" class="px-3 py-1 bg-gray-200 text-gray-700 rounded text-sm hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed" disabled>Previous</button>
+                                    <span class="mx-3 text-gray-700 text-sm">
+                                        Page <span id="currentPageDisplay">1</span> of <span id="totalPages">1</span>
+                                    </span>
+                                    <button id="nextPage" class="px-3 py-1 bg-gray-200 text-gray-700 rounded text-sm hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed" disabled>Next</button>
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+    
+    <!-- Sidebar functionality script -->
+    <script src="js/sidebar.js"></script>
+</body>
+</html> 

@@ -1,0 +1,493 @@
+    function generateProjectInformationReport(xerData) {
+        console.log('DEBUG: Project Data:', xerData.tables?.PROJECT);
+
+        // Get the first project from the array and validate it
+        const projectData = Array.isArray(xerData.tables?.PROJECT) ? xerData.tables.PROJECT[0] : null;
+        const tasks = xerData.tables?.TASK || [];
+        console.log(projectData);
+
+        if (!projectData) {
+            console.error('No valid project data found');
+            showToast('No valid project data available', 'error');
+            return;
+        }
+
+        try {
+            // Validate project data structure
+            if (typeof projectData !== 'object') {
+                throw new Error('Invalid project data structure');
+            }
+
+            console.log('DEBUG: Project Data Structure:', {
+                proj_short_name: projectData.proj_short_name,
+                proj_name: projectData.proj_name,
+                plan_start_date: projectData.plan_start_date,
+                plan_end_date: projectData.plan_end_date
+            });
+
+        // Safely get project data with fallbacks
+        const projectInfo = {
+            proj_short_name: projectData.proj_short_name || 'N/A',
+                proj_name: projectData.proj_name || 'N/A',
+            plan_start_date: projectData.plan_start_date || null,
+            plan_end_date: projectData.plan_end_date || null,
+            scd_end_date: projectData.scd_end_date || null,
+                DataDate: projectData.last_recalc_date || null,
+                proj_id: projectData.proj_id || 'N/A',
+                status_code: projectData.status_code || 'N/A',
+                priority_type: projectData.priority_type || 'N/A',
+                last_recalc_date: projectData.last_recalc_date || null
+            };
+
+            // Update project details with enhanced information
+            const updateElement = (id, value) => {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.textContent = value;
+                } else {
+                    console.warn(`Element with id ${id} not found`);
+                }
+            };
+
+            updateElement('projectName', projectInfo.proj_short_name);
+            updateElement('plannedStartDate', formatDate(projectInfo.plan_start_date));
+            updateElement('plannedEndDate', formatDate(projectInfo.plan_end_date));
+            updateElement('scheduledEndDate', formatDate(projectInfo.scd_end_date));
+            updateElement('lastRecalcDate', formatDate(projectInfo.DataDate));
+
+            // Calculate project status with more detailed logic
+        let status = 'N/A';
+            let statusClass = 'text-muted';
+        if (projectInfo.plan_end_date && projectInfo.scd_end_date) {
+            const today = new Date();
+            const plannedEnd = new Date(projectInfo.plan_end_date);
+            const scheduledEnd = new Date(projectInfo.scd_end_date);
+            
+            if (scheduledEnd > plannedEnd) {
+                status = 'Delayed';
+                    statusClass = 'text-danger';
+            } else if (today > scheduledEnd) {
+                status = 'Overdue';
+                    statusClass = 'text-danger';
+                } else if (today > plannedEnd) {
+                    status = 'At Risk';
+                    statusClass = 'text-warning';
+            } else {
+                status = 'On Track';
+                    statusClass = 'text-success';
+                }
+            }
+            
+            const statusElement = document.getElementById('projectStatus');
+            if (statusElement) {
+                statusElement.textContent = status;
+                statusElement.className = statusClass;
+            }
+
+            // Clean up existing charts
+            cleanupCharts(['projectTimelineChart', 'activitiesStatusChart', 'milestonesStatusChart', 'criticalStatusChart']);
+
+            // Generate Project Timeline Chart with enhanced data
+            const timelineCtx = document.getElementById('projectTimelineChart').getContext('2d');
+            const startDate = new Date(projectInfo.plan_start_date);
+            const endDate = new Date(projectInfo.plan_end_date);
+            const currentDate = new Date(projectInfo.last_recalc_date);
+            const totalDuration = endDate - startDate;
+            const elapsedDuration = currentDate - startDate;
+            const progress = Math.min(100, Math.max(0, (elapsedDuration / totalDuration) * 100));
+
+            // Calculate schedule variance
+            const scheduleVariance = endDate - new Date(projectInfo.scd_end_date);
+            const scheduleVarianceDays = Math.round(scheduleVariance / (1000 * 60 * 60 * 24));
+
+            new Chart(timelineCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['Project Timeline'],
+                    datasets: [
+                        {
+                            label: 'Project Duration',
+                            data: [100],
+                            backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Current Progress',
+                            data: [progress],
+                            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                font: {
+                                    size: 12
+                                }
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: `Project Timeline Progress (Schedule Variance: ${scheduleVarianceDays} days)`,
+                            font: {
+                                size: 14
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.dataset.label}: ${context.raw.toFixed(1)}%`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            max: 100,
+                            title: {
+                                display: true,
+                                text: 'Progress (%)'
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Generate all other charts with enhanced error handling
+            try {
+                generateActivitiesStatusChart(xerData);
+            } catch (error) {
+                console.error('Error generating activities status chart:', error);
+                showToast('Error generating activities status chart', 'error');
+            }
+
+            try {
+                generateMilestonesStatusChart(xerData);
+            } catch (error) {
+                console.error('Error generating milestones status chart:', error);
+                showToast('Error generating milestones status chart', 'error');
+            }
+
+            try {
+                generateCriticalStatusChart(xerData);
+            } catch (error) {
+                console.error('Error generating critical status chart:', error);
+                showToast('Error generating critical status chart', 'error');
+            }
+
+            // Generate Activity Hierarchy and WBS Hierarchy tables
+            try {
+                console.log('Generating Activity Hierarchy...');
+            generateActivityHierarchyGantt(xerData);
+            } catch (error) {
+                console.error('Error generating activity hierarchy:', error);
+                showToast('Error generating activity hierarchy: ' + error.message, 'error');
+            }
+
+            try {
+                console.log('Generating WBS Hierarchy...');
+            generateWBSHierarchyGantt(xerData);
+            } catch (error) {
+                console.error('Error generating WBS hierarchy:', error);
+                showToast('Error generating WBS hierarchy: ' + error.message, 'error');
+            }
+
+        } catch (error) {
+            console.error('Error in generateProjectInformationReport:', error);
+            showToast('Error generating project information report: ' + error.message, 'error');
+        }
+    }
+
+    function cleanupCharts(chartIds) {
+        chartIds.forEach(id => {
+            const chart = Chart.getChart(document.getElementById(id));
+            if (chart) {
+                chart.destroy();
+            }
+        });
+    }
+
+        function generateActivitiesStatusChart(xerData) {
+        try {
+                const tasks = xerData.tables?.TASK || [];
+            if (!tasks || !tasks.length) {
+                console.warn('No tasks data available for activities chart');
+                return;
+            }
+
+            // Filter only activities (non-milestones)
+                const activities = tasks.filter(tasks => tasks.task_type === 'TT_Task');
+            console.log('Check Task Length', tasks);            
+            // Count activities by status
+            const statusCounts = {
+                    'Not Started': activities.filter(tasks => tasks.status_code === 'TK_NotStart').length,
+                    'In Progress': activities.filter(tasks => tasks.status_code === 'TK_Active').length,
+                    'Completed': activities.filter(tasks => tasks.status_code === 'TK_Complete').length,
+                    'Suspended': activities.filter(tasks => tasks.status_code === 'TK_Suspend').length
+            };
+
+            const ctx = document.getElementById('activitiesStatusChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(statusCounts),
+                    datasets: [{
+                        data: Object.values(statusCounts),
+                        backgroundColor: [
+                            '#3498db', // Not Started
+                            '#f1c40f', // In Progress
+                            '#2ecc71', // Completed
+                            '#e74c3c'  // Suspended
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                font: {
+                                    size: 12
+                                }
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: 'Activities Status Distribution',
+                            font: {
+                                size: 14
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.raw || 0;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = Math.round((value / total) * 100);
+                                    return `${label}: ${value} (${percentage}%)`;
+                                }
+                            },
+                            datalabels: {
+                                display: true,
+                                color: '#000',
+                                font: {
+                                    weight: 'bold'
+                                },
+                                formatter: function(value, context) {
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = Math.round((value / total) * 100);
+                                    return value > 0 ? `${value}\n(${percentage}%)` : '';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        } catch (error) {
+            console.error('Error generating activities status chart:', error);
+            showToast('Error generating activities status chart', 'error');
+        }
+    }
+
+        function generateMilestonesStatusChart(xerData) {
+        try {
+                const tasks = xerData.tables?.TASK || [];
+            if (!tasks || !tasks.length) {
+                console.warn('No tasks data available for milestones chart');
+            return;
+        }
+
+            // Filter only milestones
+                const milestones = tasks.filter(tasks => tasks.task_type === 'TT_Mile');
+            
+            // Count milestones by status
+            const statusCounts = {
+                    'Not Started': milestones.filter(tasks => tasks.status_code === 'TK_NotStart').length,
+                    'In Progress': milestones.filter(tasks => tasks.status_code === 'TK_Active').length,
+                    'Completed': milestones.filter(tasks => tasks.status_code === 'TK_Complete').length,
+                    'Suspended': milestones.filter(tasks => tasks.status_code === 'TK_Suspend').length
+            };
+
+            const ctx = document.getElementById('milestonesStatusChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(statusCounts),
+                    datasets: [{
+                        data: Object.values(statusCounts),
+                        backgroundColor: [
+                            '#3498db', // Not Started
+                            '#f1c40f', // In Progress
+                            '#2ecc71', // Completed
+                            '#e74c3c'  // Suspended
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                font: {
+                                    size: 12
+                                }
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: 'Milestones Status Distribution',
+                            font: {
+                                size: 14
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.raw || 0;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = Math.round((value / total) * 100);
+                                    return `${label}: ${value} (${percentage}%)`;
+                                }
+                            },
+                            datalabels: {
+                                display: true,
+                                color: '#000',
+                                font: {
+                                    weight: 'bold'
+                                },
+                                formatter: function(value, context) {
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = Math.round((value / total) * 100);
+                                    return value > 0 ? `${value}\n(${percentage}%)` : '';
+                                }
+                            }
+                        }
+                    }
+                }
+    });
+        } catch (error) {
+            console.error('Error generating milestones status chart:', error);
+            showToast('Error generating milestones status chart', 'error');
+        }
+    }
+
+        function generateCriticalStatusChart(xerData) {
+        try {
+                const tasks = xerData.tables?.TASK || [];
+            if (!tasks || !tasks.length) {
+                console.warn('No tasks data available for critical status chart');
+                return;
+            }
+
+            // Filter critical activities and milestones
+                const criticalItems = tasks.filter(tasks => tasks.driving_path_flag === 'Y' || tasks.driving_path_flag === true);
+            
+            // Separate critical activities and milestones
+                const criticalActivities = criticalItems.filter(tasks => tasks.task_type === 'TT_Task');
+                const criticalMilestones = criticalItems.filter(tasks => tasks.task_type === 'TT_Mile');
+            
+            // Count by status for both activities and milestones
+            const activityStatusCounts = {
+                    'Not Started': criticalActivities.filter(tasks => tasks.status_code === 'TK_NotStart').length,
+                    'In Progress': criticalActivities.filter(tasks => tasks.status_code === 'TK_Active').length,
+                    'Completed': criticalActivities.filter(tasks => tasks.status_code === 'TK_Complete').length,
+                    'Suspended': criticalActivities.filter(tasks => tasks.status_code === 'TK_Suspend').length
+            };
+
+            const milestoneStatusCounts = {
+                    'Not Started': criticalMilestones.filter(tasks => tasks.status_code === 'TK_NotStart').length,
+                    'In Progress': criticalMilestones.filter(tasks => tasks.status_code === 'TK_Active').length,
+                    'Completed': criticalMilestones.filter(tasks => tasks.status_code === 'TK_Complete').length,
+                    'Suspended': criticalMilestones.filter(tasks => tasks.status_code === 'TK_Suspend').length
+            };
+
+            const ctx = document.getElementById('criticalStatusChart').getContext('2d');
+            new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                    labels: ['Not Started', 'In Progress', 'Completed', 'Suspended'],
+                    datasets: [
+                        {
+                            label: 'Critical Activities',
+                            data: Object.values(activityStatusCounts),
+                            backgroundColor: '#3498db',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Critical Milestones',
+                            data: Object.values(milestoneStatusCounts),
+                            backgroundColor: '#e74c3c',
+                            borderWidth: 1
+                        }
+                    ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                            position: 'top',
+                            labels: {
+                                font: {
+                                    size: 12
+                                }
+                            }
+                            },
+                            title: {
+                                display: true,
+                            text: 'Critical Activities and Milestones Status',
+                            font: {
+                                size: 14
+                            }
+                            },
+                            datalabels: {
+                                display: true,
+                                color: '#000',
+                                anchor: 'end',
+                                align: 'top',
+                                formatter: function(value) {
+                                    return value > 0 ? value : '';
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Count'
+                                }
+                            }
+                        }
+                    }
+                });
+        } catch (error) {
+            console.error('Error generating critical status chart:', error);
+            showToast('Error generating critical status chart', 'error');
+        }
+    }
+
+    function calculateDuration(startDate, endDate) {
+        if (!startDate || !endDate) return 0;
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        const diffTime = Math.abs(end - start);
+        return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    }

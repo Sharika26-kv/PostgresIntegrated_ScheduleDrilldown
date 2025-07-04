@@ -1,0 +1,1837 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Procore Gantt Chart Clone</title>
+    <style>
+        /* Add resizable table styles */
+        .resizable-container {
+            position: relative;
+            display: flex;
+            height: 100%;
+        }
+        
+        .resizer {
+            width: 10px;
+            cursor: col-resize;
+            height: 100%;
+            background-color: #f0f0f0;
+            border-left: 1px solid #ccc;
+            border-right: 1px solid #ccc;
+            z-index: 10;
+        }
+        
+        .resizer:hover, .resizer.active {
+            background-color: #ddd;
+        }
+        
+        /* Resizable columns */
+        .task-table th {
+            position: relative;
+            resize: horizontal;
+            overflow: auto;
+        }
+        
+        .task-table th::after {
+            content: '';
+            position: absolute;
+            right: 0;
+            top: 0;
+            height: 100%;
+            width: 5px;
+            background-color: transparent;
+            cursor: col-resize;
+        }
+        
+        .task-table th:hover::after {
+            background-color: #ddd;
+        }
+        
+        /* Button active state */
+        .toolbar button.active {
+            background-color: #007bff;
+            color: white;
+        }
+        
+        /* Base styles */
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* Prevent main body scroll */
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            color: #333;
+        }
+
+        /* Header styles */
+        .header {
+            padding: 10px;
+            border-bottom: 1px solid #ccc;
+            background-color: #f8f8f8;
+        }
+
+        .header h1 {
+            margin: 0 0 10px 0;
+            font-size: 1.5rem;
+        }
+
+        .toolbar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .toolbar select, .toolbar button {
+            padding: 5px 10px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            background-color: #fff;
+        }
+
+        .toolbar button {
+            cursor: pointer;
+        }
+
+        .toolbar button:hover {
+            background-color: #f0f0f0;
+        }
+
+        /* Main container styles */
+        #app-container {
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+            overflow: hidden;
+        }
+
+        /* Status messages */
+        #status-messages {
+            text-align: center;
+            padding: 10px;
+            display: none;
+            width: 100%;
+            box-sizing: border-box;
+            flex-shrink: 0;
+        }
+
+        /* Table and chart container */
+        .content-container {
+            display: flex;
+            flex-grow: 1;
+            overflow: hidden;
+        }
+
+        /* Task table styles */
+        #task-table-container {
+            width: 400px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #ccc;
+            flex-shrink: 0;
+        }
+
+        .table-header {
+            background-color: #f5f5f5;
+            border-bottom: 1px solid #ddd;
+            flex-shrink: 0;
+            overflow: hidden;
+        }
+
+        .table-body {
+            overflow-y: auto;
+            flex-grow: 1;
+        }
+
+        .task-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+
+        .task-table th, .task-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .task-table th {
+            background-color: #f5f5f5;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            font-weight: 600;
+        }
+
+        .task-table tr {
+            height: 30px;
+            box-sizing: border-box;
+        }
+
+        .task-table tbody tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+
+        .task-table tbody tr:hover {
+            background-color: #f0f0f0;
+        }
+
+        /* Column widths */
+        .task-table .col-seq { width: 40px; }
+        .task-table .col-task-name { width: 200px; }
+        .task-table .col-start-date { width: 90px; }
+        .task-table .col-finish-date { width: 90px; }
+        .task-table .col-duration { width: 70px; }
+        .task-table .col-percent { width: 70px; }
+        .task-table .col-resources { width: 120px; }
+        .task-table .col-wbs { width: 70px; }
+
+        /* Gantt chart styles */
+        #gantt-chart-container {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Timeline header */
+        #timeline-header-container {
+            overflow-x: hidden;
+            background-color: #f5f5f5;
+            border-bottom: 1px solid #ddd;
+            flex-shrink: 0;
+        }
+
+        #timelineHeader {
+            height: 50px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .month-headers {
+            display: flex;
+            height: 25px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .month-header {
+            height: 100%;
+            box-sizing: border-box;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-right: 1px solid #ddd;
+            font-weight: 600;
+            font-size: 0.9rem;
+            background-color: #f8f8f8;
+        }
+
+        .day-headers {
+            display: flex;
+            height: 25px;
+        }
+
+        .day-header {
+            width: 20px;
+            height: 100%;
+            box-sizing: border-box;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-right: 1px solid #eee;
+            font-size: 0.8rem;
+            color: #666;
+        }
+
+        /* Timeline area */
+        #timeline-area-container {
+            flex-grow: 1;
+            overflow: auto;
+            position: relative;
+        }
+
+        #timelineArea {
+            position: relative;
+        }
+
+        .timeline-grid {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+        }
+
+        .vertical-grid-line {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 1px;
+            background-color: #eee;
+        }
+
+        /* Task rows in the Gantt area */
+        .task-row-area {
+            position: relative;
+            height: 30px;
+            border-bottom: 1px solid #eee;
+        }
+
+        /* Gantt bars */
+        #ganttBars {
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        .gantt-bar {
+            position: absolute;
+            height: 18px;
+            background-color: #007bff;
+            border-radius: 3px;
+            margin-top: 6px;
+            box-shadow: 1px 1px 3px rgba(0,0,0,0.2);
+            z-index: 1;
+        }
+
+        .gantt-bar.milestone {
+            width: 12px !important;
+            height: 12px !important;
+            background-color: #ffc107;
+            transform: rotate(45deg);
+            margin-top: 9px;
+            border-radius: 0;
+        }
+
+        .gantt-bar.summary {
+            background-color: #333;
+            height: 14px;
+            margin-top: 8px;
+            border-radius: 0;
+        }
+
+        .gantt-bar.critical {
+            background-color: #dc3545;
+        }
+
+        .gantt-bar.completed {
+            background-color: #28a745;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background-color: rgba(0,0,0,0.2);
+            border-radius: 3px 0 0 3px;
+        }
+
+        .bar-label {
+            position: absolute;
+            top: 0;
+            left: 8px;
+            color: white;
+            font-size: 11px;
+            line-height: 20px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: calc(100% - 16px);
+            pointer-events: none;
+        }
+
+        /* Dependencies */
+        #dependencyLines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .dependency-line {
+            position: absolute;
+            background-color: #666;
+            height: 2px;
+            z-index: 0;
+        }
+        
+        .dependency-line.vertical {
+            width: 2px !important;
+            height: auto;
+            background-color: #666;
+        }
+
+        .dependency-arrow {
+            position: absolute;
+            width: 0;
+            height: 0;
+            border-style: solid;
+            border-width: 4px 0 4px 6px;
+            border-color: transparent transparent transparent #666;
+            z-index: 1;
+        }
+        
+        /* Summary task styling */
+        .summary-task {
+            font-weight: 600;
+            background-color: #f7f7f7;
+        }
+        
+        .summary-task td {
+            border-top: 1px solid #aaa;
+            border-bottom: 1px solid #aaa;
+        }
+        
+        .summary-task .task-expand-icon {
+            color: #333;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        /* Status messages */
+        .loading-state, .error-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            font-size: 1.2em;
+            color: #555;
+        }
+
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error-state {
+            color: #dc3545;
+            text-align: center;
+        }
+
+        .error-title {
+            font-size: 1.5em;
+            margin-bottom: 10px;
+        }
+
+        .error-details {
+            margin-top: 20px;
+            font-size: 0.9em;
+            color: #777;
+            text-align: left;
+        }
+
+        /* Task hierarchy (indentation) */
+        .task-indent {
+            display: inline-block;
+            width: 20px;
+            margin-right: 0;
+        }
+
+        .task-expand-icon {
+            cursor: pointer;
+            display: inline-block;
+            width: 16px;
+            text-align: center;
+            margin-right: 4px;
+        }
+
+        /* Utility classes */
+        .hide-progress .progress-fill {
+            display: none;
+        }
+
+        /* Parent task styling */
+        .parent-task td {
+            font-weight: 600;
+            background-color: #f7f7f7;
+            border-top: 1px solid #aaa;
+        }
+
+        /* Child task styling */
+        .child-task td {
+            padding-left: 8px;
+        }
+
+        /* WBS hierarchy levels styling */
+        .wbs-level-0 { font-weight: bold; background-color: #e9ecef; }
+        .wbs-level-1 { padding-left: 10px; background-color: #f5f5f5; }
+        .wbs-level-2 { padding-left: 20px; background-color: #f8f9fa; }
+        .wbs-level-3 { padding-left: 30px; }
+        .wbs-level-4 { padding-left: 40px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Procore Gantt Chart Clone</h1>
+        <div class="toolbar">
+            <label for="projectSelect">Select Project:</label>
+            <select id="projectSelect">
+                <option value="">Loading projects...</option>
+            </select>
+            <button id="showCritical">Show Critical Path Only</button>
+            <button id="showProgress">Show Progress</button>
+            <button id="showDependencies" class="active">Show Dependencies</button>
+            <button id="showWbsOnly" class="active">Show WBS Tasks Only</button>
+            <button id="zoomIn">+</button>
+            <button id="zoomOut">-</button>
+            <button id="fitView">Fit to View</button>
+        </div>
+    </div>
+
+    <div id="app-container">
+        <div id="status-messages"></div>
+        
+        <div class="content-container">
+            <!-- Resizable task table -->
+            <div class="resizable-container">
+                <div id="task-table-container">
+                    <div class="table-header">
+                        <table class="task-table">
+                            <thead>
+                                <tr>
+                                    <th class="col-wbs">WBS ID</th>
+                                    <th class="col-task-name">Task Name</th>
+                                    <th class="col-start-date">Start</th>
+                                    <th class="col-finish-date">Finish</th>
+                                    <th class="col-duration">Duration</th>
+                                    <th class="col-percent">% Complete</th>
+                                    <th class="col-resources">Resources</th>
+                                    <th class="col-seq">Seq</th>
+                                </tr>
+                            </thead>
+                        </table>
+                    </div>
+                    <div class="table-body">
+                        <table class="task-table">
+                            <tbody id="task-table-body">
+                                <!-- Task rows will be populated here by JavaScript -->
+                                <tr><td colspan="7">Placeholder: Loading tasks...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- Resizer element -->
+                <div class="resizer" id="table-resizer"></div>
+            </div>
+            
+            <!-- Gantt Chart -->
+            <div id="gantt-chart-container">
+                <div id="timeline-header-container">
+                    <div id="timelineHeader">
+                        <!-- Timeline header (months/days) will be rendered here by JavaScript -->
+                        <div class="month-headers"></div>
+                        <div class="day-headers"></div>
+                    </div>
+                </div>
+                <div id="timeline-area-container">
+                    <div id="timelineArea">
+                        <div class="timeline-grid" id="timelineGrid"></div>
+                        <div id="ganttBars">
+                            <!-- Gantt bars will be rendered here by JavaScript -->
+                        </div>
+                        <div id="dependencyLines">
+                            <!-- Dependency lines will be rendered here by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        console.log('Script start.');
+
+        // API Base URL - UPDATE THIS TO YOUR SERVER ADDRESS IF DIFFERENT
+        const API_BASE = 'http://localhost:3000/api';
+
+        let projectTasks = [];
+        let projectWBS = [];
+        let projectDependencies = [];
+        let projectResources = [];
+        let projectStartDate = null;
+        let projectEndDate = null;
+        let timelineScale = 1; // Initial scale (e.g., 1 = 4px per day)
+        const selectedTasks = new Set(); // To keep track of selected tasks
+
+        // Utility to format dates
+        function formatDate(dateString) {
+            if (!dateString) return '';
+            const options = { year: 'numeric', month: '2-digit', day: '2-digit' };
+            const date = new Date(dateString);
+            return date.toLocaleDateString(undefined, options);
+        }
+
+        // Utility to format duration (simple example)
+        function formatDuration(durationInDays) {
+            return durationInDays ? `${durationInDays} d` : '';
+        }
+
+        // Helper function to get task start date based on status
+        function getTaskStartDate(task) {
+            if (!task) return null;
+            // Use property names from API response based on status_code
+            if (task.status_code === 'TK_Complete' || task.status_code === 'TK_Active') {
+                return task.act_start_date;
+            } else {
+                return task.target_start_date;
+            }
+        }
+
+        // Helper function to get task end date based on status
+        function getTaskEndDate(task) {
+            if (!task) return null;
+            // Use property names from API response based on status_code
+            if (task.status_code === 'TK_NotStart' || task.status_code === 'TK_Active') {
+                return task.target_end_date;
+            } else {
+                return task.act_end_date;
+            }
+        }
+
+        // Load Projects
+        async function loadProjects() {
+            console.log('Attempting to load projects...');
+            try {
+                const projects = await fetchAPI('/projects');
+                console.log('Projects loaded:', projects);
+                const projectSelect = document.getElementById('projectSelect');
+                projectSelect.innerHTML = ''; // Clear loading option
+                if (projects && projects.length > 0 && projects[0] && projects[0].proj_id) {
+                    // Store the current project information more completely
+                     currentProject = { id: projects[0].proj_id, name: projects[0].proj_name || `Project ${projects[0].proj_id}` };
+                    projects.forEach(project => {
+                        const option = document.createElement('option');
+                        option.value = project.proj_id;
+                        option.textContent = project.proj_name || `Project ${project.proj_id}`;
+                        option.dataset.projectName = project.proj_name || `Project ${project.proj_id}`;
+                        projectSelect.appendChild(option);
+                    });
+                     // Automatically load the first project
+                    loadProjectData(currentProject.id, currentProject.name);
+                    // setupEventHandlers(); // Moved event handler setup here
+                } else {
+                    projectSelect.innerHTML = '<option value="">No projects found</option>';
+                    showErrorState('No Projects', 'No projects were loaded from the server or the first project is missing an ID.');
+                }
+            } catch (error) {
+                console.error('Error loading projects:', error);
+                showErrorState('Load Error', 'Failed to load projects.');
+            }
+        }
+
+        // Load Project Data
+        async function loadProjectData(projectId, projectName) {
+            console.log(`Attempting to load data for project ${projectId}...`);
+            showLoadingState(`Loading ${projectName}...`);
+            try {
+                // Fetch data from multiple endpoints
+                const [tasksData, wbsData, dependenciesData, resourcesData] = await Promise.all([
+                    fetchAPI(`/projects/${projectId}/tasks`),
+                    fetchAPI(`/projects/${projectId}/wbs`),
+                    fetchAPI(`/projects/${projectId}/dependencies`),
+                    fetchAPI(`/projects/${projectId}/resources`)
+                ]);
+                
+                console.log('Project data loaded:', { tasksData, wbsData, dependenciesData, resourcesData });
+
+                projectTasks = tasksData || [];
+                projectWBS = wbsData || [];
+                projectDependencies = dependenciesData || [];
+                projectResources = resourcesData || []; // Assuming this is resource assignments linked to tasks
+
+                // Sort tasks by sequence number
+                projectTasks.sort((a, b) => {
+                    const seqA = a.seq_num || a.task_code || '';
+                    const seqB = b.seq_num || b.task_code || '';
+                    return seqA.localeCompare(seqB, undefined, {numeric: true, sensitivity: 'base'});
+                });
+
+                // Create a map of WBS objects for quick lookup
+                const wbsMap = new Map();
+                projectWBS.forEach(wbs => {
+                    wbsMap.set(wbs.wbs_id, wbs);
+                });
+                
+                // Group tasks by WBS
+                const tasksByWbs = {};
+                projectTasks.forEach(task => {
+                    if (!tasksByWbs[task.wbs_id]) {
+                        tasksByWbs[task.wbs_id] = [];
+                    }
+                    tasksByWbs[task.wbs_id].push(task);
+                });
+                
+                // Create a set of WBS summary task IDs
+                const wbsSummaryTaskIds = new Set();
+                Object.entries(tasksByWbs).forEach(([wbsId, tasks]) => {
+                    if (tasks.length > 0) {
+                        // For each WBS, identify the task that represents the WBS itself (usually the first one)
+                        const summaryTask = tasks[0];
+                        if (summaryTask) {
+                            wbsSummaryTaskIds.add(summaryTask.task_id);
+                        }
+                    }
+                });
+
+                // Check if we should only show WBS summary tasks
+                const showWbsOnly = document.getElementById('showWbsOnly') && document.getElementById('showWbsOnly').classList.contains('active');
+                
+                // Filter tasks based on WBS if the option is selected
+                const originalTaskCount = projectTasks.length;
+                if (showWbsOnly) {
+                    projectTasks = projectTasks.filter(task => wbsSummaryTaskIds.has(task.task_id));
+                    console.log(`Filtered to WBS summary tasks: Reduced from ${originalTaskCount} to ${projectTasks.length} based on ${wbsSummaryTaskIds.size} WBS items.`);
+                } else {
+                    console.log(`Showing all ${projectTasks.length} tasks.`);
+                }
+
+                // Debug: Log first 5 tasks data after filtering
+                console.log('First 5 tasks data (after filtering):', projectTasks.slice(0, 5).map(task => ({
+                    id: task.task_id, // Use task_id as id
+                    task_name: task.task_name,
+                    status_code: task.status_code, // Include status_code for context
+                    act_start_date: task.act_start_date,
+                    act_end_date: task.act_end_date,
+                    target_start_date: task.target_start_date,
+                    target_end_date: task.target_end_date,
+                    resolvedStartDate: getTaskStartDate(task), // Show resolved date
+                    resolvedEndDate: getTaskEndDate(task) // Show resolved date
+                })));
+
+                // Determine project start and end dates from tasks
+                if (projectTasks.length > 0) {
+                    // Filter out invalid dates before finding min/max using helper functions
+                    const validStartDates = projectTasks.map(task => new Date(getTaskStartDate(task))).filter(date => !isNaN(date.getTime()));
+                    const validEndDates = projectTasks.map(task => new Date(getTaskEndDate(task))).filter(date => !isNaN(date.getTime()));
+
+                    if (validStartDates.length > 0) {
+                        projectStartDate = new Date(Math.min(...validStartDates));
+                    } else {
+                         projectStartDate = null;
+                    }
+
+                    if (validEndDates.length > 0) {
+                         projectEndDate = new Date(Math.max(...validEndDates));
+                    } else {
+                         projectEndDate = null;
+                    }
+
+                } else {
+                    projectStartDate = null;
+                    projectEndDate = null;
+                }
+
+                // Debug: Log calculated project dates
+                console.log('Calculated Project Start Date:', projectStartDate, 'Calculated Project End Date:', projectEndDate);
+                
+                // Render all components with same data
+                renderTaskTable();
+                renderTimelineHeader();
+                renderGanttBars();
+
+                // Check if dependencies should be visible and render them
+                const showDependencies = document.getElementById('showDependencies') && 
+                                       document.getElementById('showDependencies').classList.contains('active');
+                if (showDependencies) {
+                    setTimeout(() => {
+                        renderDependencyLines();
+                    }, 100); // Small delay to ensure Gantt bars are properly rendered first
+                }
+
+                applyViewFilters(); // Apply default filters after loading
+
+                hideStatusMessages(); // Hide loading message on success
+                setupEventHandlers(); // Moved event handler setup here
+
+            } catch (error) {
+                console.error(`Error loading data for project ${projectId}:`, error);
+                showErrorState(`Load Error: ${projectName}`, `Failed to load project data. Details: ${error.message}`);
+            }
+        }
+        
+        // Render Task Data Table
+        function renderTaskTable() {
+            console.log('Rendering task table...');
+            const taskTableBody = document.getElementById('task-table-body');
+            taskTableBody.innerHTML = ''; // Clear existing rows
+
+            if (!projectTasks || projectTasks.length === 0) {
+                taskTableBody.innerHTML = '<tr><td colspan="8">No tasks available.</td></tr>';
+                return;
+            }
+
+            // Create a map of WBS objects for quick lookup
+            const wbsMap = new Map();
+            projectWBS.forEach(wbs => {
+                wbsMap.set(wbs.wbs_id, wbs);
+            });
+            
+            // Group tasks by WBS for determining parent/child relationships
+            const tasksByWbs = {};
+            projectTasks.forEach(task => {
+                if (!tasksByWbs[task.wbs_id]) {
+                    tasksByWbs[task.wbs_id] = [];
+                }
+                tasksByWbs[task.wbs_id].push(task);
+            });
+            
+            // Filter tasks based on "Show Critical Path Only" if active
+            const showCriticalOnly = document.getElementById('showCritical') && 
+                                   document.getElementById('showCritical').classList.contains('active');
+            
+            // Sort tasks by sequence number before rendering
+            const tasksToRender = [...projectTasks];
+            tasksToRender.sort((a, b) => {
+                // If seq_num is not available, use task_code as fallback
+                const seqA = a.seq_num || a.task_code || '';
+                const seqB = b.seq_num || b.task_code || '';
+                return seqA.localeCompare(seqB, undefined, {numeric: true, sensitivity: 'base'});
+            });
+            
+            // Process WBS codes to determine hierarchy levels
+            const wbsHierarchy = {};
+            tasksToRender.forEach(task => {
+                const taskCode = task.seq_num || task.task_code || '';
+                if (taskCode) {
+                    // Extract the WBS levels from the code (e.g., "1.01.02" -> [1, 01, 02])
+                    const levels = taskCode.split('.').map(part => part.trim());
+                    wbsHierarchy[taskCode] = {
+                        levels: levels,
+                        depth: levels.length
+                    };
+                }
+            });
+            
+            // Render each visible task row
+            let visibleTaskIndex = 0;
+            
+            tasksToRender.forEach((task, index) => {
+                // Apply critical path filtering
+                const isCritical = task.driving_path_flag === 'Y';
+                const shouldHide = showCriticalOnly && !isCritical;
+                
+                if(shouldHide) {
+                    return; // Skip rendering if task is hidden by filter
+                }
+                
+                const row = document.createElement('tr');
+                row.classList.add('task-row'); // Add a class for filtering
+                row.dataset.taskId = task.task_id;
+                row.dataset.visibleIndex = visibleTaskIndex.toString(); // Store visible index for Gantt alignment
+                
+                if (isCritical) row.classList.add('critical');
+
+                // Get task code and determine hierarchy level
+                const taskCode = task.seq_num || task.task_code || '';
+                const hierarchyInfo = wbsHierarchy[taskCode] || { levels: [], depth: 0 };
+                const hierarchyLevel = hierarchyInfo.depth - 1; // 0-based level
+                
+                // Add hierarchy classes
+                row.classList.add(`wbs-level-${hierarchyLevel}`);
+                
+                // Determine if this is a parent or child task based on hierarchy
+                const isParentTask = hierarchyLevel < 2; // Top-level tasks (0 or 1 depth)
+                const isChildTask = hierarchyLevel >= 2; // Deeper nested tasks
+                
+                if (isParentTask) row.classList.add('parent-task');
+                if (isChildTask) row.classList.add('child-task');
+                
+                // Get WBS and parent WBS information for indentation
+                const wbs = wbsMap.get(task.wbs_id);
+                const indentLevel = hierarchyLevel; // Use hierarchy level for indentation
+                
+                // Check if this is a summary/parent task
+                const isSummary = isParentTask || hasChildTasks(task, tasksByWbs);
+                if (isSummary) {
+                    row.classList.add('summary-task');
+                }
+                
+                // Format indented task name with expand/collapse icon if applicable
+                let taskNameHtml = '';
+                
+                // Add indentation based on hierarchy level
+                for (let i = 0; i < indentLevel; i++) {
+                    taskNameHtml += '<span class="task-indent"></span>';
+                }
+                
+                // Add expand/collapse icon for summary tasks (tasks with children)
+                if (isSummary) {
+                    taskNameHtml += '<span class="task-expand-icon">▼</span>';
+                    taskNameHtml += `<strong>${task.task_name}</strong>`;
+                } else {
+                    // Add space where the icon would be for alignment
+                    taskNameHtml += '<span class="task-expand-icon">&nbsp;</span>';
+                    taskNameHtml += task.task_name;
+                }
+                
+                // Resolve dates based on status
+                const startDateStr = getTaskStartDate(task);
+                const finishDateStr = getTaskEndDate(task);
+                
+                // Create the table row
+                row.innerHTML = `
+                    <td class="col-wbs">${task.wbs_id || ''}</td>
+                    <td class="col-task-name">${taskNameHtml}</td>
+                    <td class="col-start-date">${formatDate(startDateStr)}</td>
+                    <td class="col-finish-date">${formatDate(finishDateStr)}</td>
+                    <td class="col-duration">${task.target_drtn_hr_cnt ? `${Math.round(task.target_drtn_hr_cnt / 8)}d` : ''}</td>
+                    <td class="col-percent">${Math.round(task.phys_complete_pct) || 0}%</td>
+                    <td class="col-resources">${task.assignedResources || ''}</td>
+                    <td class="col-seq">${taskCode}</td>
+                `;
+                
+                taskTableBody.appendChild(row);
+                visibleTaskIndex++;
+            });
+            
+            console.log('Task table rendered with', visibleTaskIndex, 'visible tasks.');
+            return visibleTaskIndex;
+        }
+        
+        // Calculate WBS level based on parent hierarchy (for sorting)
+        function calculateWbsLevel(wbs, wbsMap) {
+            if (!wbs) return 999; // Unknown WBS goes last
+            
+            // Check if this is a top-level WBS (no parent)
+            if (!wbs.parent_wbs_id) return 0;
+            
+            // Recursively count levels
+            let level = 0;
+            let currentWbs = wbs;
+            
+            while (currentWbs && currentWbs.parent_wbs_id) {
+                level++;
+                currentWbs = wbsMap.get(currentWbs.parent_wbs_id);
+            }
+            
+            return level;
+        }
+
+        // Render Timeline Header
+        function renderTimelineHeader() {
+            console.log('Rendering timeline header...');
+            const timelineHeader = document.getElementById('timelineHeader');
+            if (!timelineHeader) { console.error('Timeline header element not found.'); return; }
+            
+            // Define row height constant for consistency
+            const ROW_HEIGHT = 30; // Match with CSS value
+            
+            // Clear existing content
+            const monthHeadersContainer = timelineHeader.querySelector('.month-headers');
+            const dayHeadersContainer = timelineHeader.querySelector('.day-headers');
+            
+            if (!monthHeadersContainer || !dayHeadersContainer) {
+                console.error('Month or day headers container not found.');
+                return;
+            }
+            
+            monthHeadersContainer.innerHTML = '';
+            dayHeadersContainer.innerHTML = '';
+
+            if (!projectStartDate || !projectEndDate) {
+                console.log('No timeline data to render header.');
+                return;
+            }
+
+            console.log('Project Start Date:', projectStartDate, 'Project End Date:', projectEndDate);
+
+            // Calculate total days and set the width of the timeline
+            const totalDays = Math.ceil((projectEndDate - projectStartDate) / (1000 * 60 * 60 * 24)) + 1;
+            const totalWidth = totalDays * (20 * timelineScale); // Each day is 20px wide by default
+            
+            timelineHeader.style.width = `${totalWidth}px`;
+            document.getElementById('timelineArea').style.width = `${totalWidth}px`;
+            document.getElementById('timelineArea').style.height = `${projectTasks.length * ROW_HEIGHT}px`; // Set height based on tasks
+            
+            // Render month headers
+            let currentDate = new Date(projectStartDate);
+            currentDate.setDate(1); // Start from the first day of the month
+            
+            // Track day position for the grid
+            let dayPosition = 0;
+            
+            // Store vertical grid lines to render
+            const gridLines = [];
+            
+            // Days to show in each month (1st, 8th, 15th, 22nd)
+            const daysToShow = [1, 8, 15, 22];
+            
+            while (currentDate <= projectEndDate) {
+                const year = currentDate.getFullYear();
+                const month = currentDate.getMonth();
+                const monthName = currentDate.toLocaleString('default', { month: 'long' });
+                const daysInMonth = getDaysInMonth(currentDate);
+                const monthWidth = daysInMonth * (20 * timelineScale);
+                
+                // Create month header
+                const monthHeader = document.createElement('div');
+                monthHeader.className = 'month-header';
+                monthHeader.textContent = `${monthName} ${year}`;
+                monthHeader.style.width = `${monthWidth}px`;
+                monthHeadersContainer.appendChild(monthHeader);
+                
+                // Create day headers for this month (only 4 per month)
+                for (let day = 1; day <= daysInMonth; day++) {
+                    const checkDate = new Date(year, month, day);
+                    
+                    // Only create day headers for specific days (1, 8, 15, 22) within the project range
+                    if (daysToShow.includes(day) && checkDate >= projectStartDate && checkDate <= projectEndDate) {
+                        const dayHeader = document.createElement('div');
+                        dayHeader.className = 'day-header';
+                        dayHeader.textContent = day;
+                        dayHeader.style.width = `${20 * timelineScale * (day === 1 ? 7 : 7)}px`;  // Make each header span ~7 days
+                        dayHeadersContainer.appendChild(dayHeader);
+                    }
+                    
+                    // Add grid line at day boundary (still show daily grid lines)
+                    if (checkDate >= projectStartDate && checkDate <= projectEndDate) {
+                        gridLines.push({
+                            position: dayPosition,
+                            isMonthStart: day === 1,
+                            isWeekStart: day % 7 === 1 || day === 1
+                        });
+                    }
+                    
+                    dayPosition += 20 * timelineScale;
+                }
+                
+                // Move to next month
+                currentDate.setMonth(month + 1);
+            }
+            
+            // Render grid lines
+            const timelineGrid = document.getElementById('timelineGrid');
+            timelineGrid.innerHTML = '';
+            timelineGrid.style.width = `${totalWidth}px`;
+            timelineGrid.style.height = '100%';
+            
+            gridLines.forEach(line => {
+                const gridLine = document.createElement('div');
+                gridLine.className = 'vertical-grid-line';
+                gridLine.style.left = `${line.position}px`;
+                
+                if (line.isMonthStart) {
+                    gridLine.style.borderLeftWidth = '2px';
+                    gridLine.style.borderLeftColor = '#888';
+                } else if (line.isWeekStart) {
+                    gridLine.style.borderLeftWidth = '1px';
+                    gridLine.style.borderLeftColor = '#aaa';
+                } else {
+                    gridLine.style.borderLeftWidth = '1px';
+                    gridLine.style.borderLeftColor = '#eee';
+                }
+                
+                timelineGrid.appendChild(gridLine);
+            });
+            
+            console.log('Timeline header rendered.');
+        }
+
+        function getDaysInMonth(date) {
+            return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+        }
+
+        // Render Gantt Bars
+        function renderGanttBars() {
+            console.log('Rendering Gantt bars...');
+            const ganttBarsContainer = document.getElementById('ganttBars');
+            const dependencyLinesContainer = document.getElementById('dependencyLines');
+            const timelineArea = document.getElementById('timelineArea');
+            
+            if (!ganttBarsContainer || !timelineArea) {
+                console.error('Gantt bars container or timeline area not found.');
+                return;
+            }
+            
+            // Clear existing bars and dependencies
+            ganttBarsContainer.innerHTML = '';
+            dependencyLinesContainer.innerHTML = '';
+            
+            // Clear task row areas (used for vertical positioning in timelineArea)
+            // Only clear the task-row-area elements, leave the grid and containers
+            const existingTaskRowAreas = timelineArea.querySelectorAll('.task-row-area');
+            existingTaskRowAreas.forEach(row => row.remove());
+            
+            if (!projectStartDate || !projectEndDate || projectTasks.length === 0) {
+                 ganttBarsContainer.innerHTML = '<div>No gantt bars available.</div>';
+                 console.log('No project start/end date or tasks to render bars.');
+                 return;
+            }
+            
+            // Get active filters
+            const showCriticalOnly = document.getElementById('showCritical') && 
+                                   document.getElementById('showCritical').classList.contains('active');
+            const showDependencies = document.getElementById('showDependencies') && 
+                                   document.getElementById('showDependencies').classList.contains('active');
+            
+            console.log('Rendering Gantt bars with filters:', 
+                      showCriticalOnly ? 'Critical Path Only' : 'All Paths',
+                      showDependencies ? ', Show Dependencies' : '');
+            
+            // Get the visible tasks from the table for perfect synchronization
+            const visibleTaskRows = document.querySelectorAll('#task-table-body .task-row');
+            console.log(`Found ${visibleTaskRows.length} visible tasks in the table to render in Gantt chart`);
+            
+            // Create a map for quick task lookup
+            const taskMap = new Map();
+            projectTasks.forEach(task => {
+                taskMap.set(task.task_id, task);
+            });
+            
+            // Define row height constant for consistency
+            const ROW_HEIGHT = 30; // Match with CSS value
+            
+            // Create task row areas and bars for each visible task
+            visibleTaskRows.forEach((row, visibleIndex) => {
+                const taskId = row.dataset.taskId;
+                const task = taskMap.get(taskId);
+                
+                if (!task) {
+                    console.warn(`Task with ID ${taskId} not found in task data`);
+                    return;
+                }
+                
+                // Create task row area for vertical alignment
+                const taskRowArea = document.createElement('div');
+                taskRowArea.className = 'task-row-area';
+                taskRowArea.dataset.taskId = taskId;
+                timelineArea.appendChild(taskRowArea);
+                
+                // Get dates
+                const startDateStr = getTaskStartDate(task);
+                const finishDateStr = getTaskEndDate(task);
+                
+                if (!startDateStr || !finishDateStr) {
+                    console.log(`Task ${task.task_name} missing valid dates`);
+                    return;
+                }
+                
+                const startDate = new Date(startDateStr);
+                const finishDate = new Date(finishDateStr);
+                
+                if (isNaN(startDate.getTime()) || isNaN(finishDate.getTime())) {
+                    console.log(`Task ${task.task_name} has invalid dates`);
+                    return;
+                }
+                
+                // Calculate bar position and size
+                const dayOffset = Math.max(0, (startDate - projectStartDate) / (1000 * 60 * 60 * 24));
+                const taskDurationDays = (finishDate - startDate) / (1000 * 60 * 60 * 24) + 1;
+                const barWidth = Math.max(4, taskDurationDays * (20 * timelineScale));
+                const leftPosition = dayOffset * (20 * timelineScale);
+                
+                // Get task code and determine hierarchy properties
+                const taskCode = task.seq_num || task.task_code || '';
+                const levels = taskCode ? taskCode.split('.').map(part => part.trim()) : [];
+                const hierarchyLevel = levels.length - 1; // 0-based level
+                const isParentTask = hierarchyLevel < 2;
+                
+                // Determine bar type
+                const wbsMap = new Map();
+                projectWBS.forEach(wbs => wbsMap.set(wbs.wbs_id, wbs));
+                
+                const tasksByWbs = {};
+                projectTasks.forEach(t => {
+                    if (!tasksByWbs[t.wbs_id]) tasksByWbs[t.wbs_id] = [];
+                    tasksByWbs[t.wbs_id].push(t);
+                });
+                
+                const isCritical = task.driving_path_flag === 'Y';
+                const isSummary = isParentTask || hasChildTasks(task, tasksByWbs);
+                const isMilestone = task.task_type === 'TT_Milestone' || taskDurationDays <= 1;
+                
+                // Create the bar
+                const bar = document.createElement('div');
+                bar.className = 'gantt-bar';
+                if (isSummary) bar.classList.add('summary');
+                if (isMilestone) bar.classList.add('milestone');
+                if (isCritical) bar.classList.add('critical');
+                if (task.phys_complete_pct >= 100) bar.classList.add('completed');
+                
+                bar.style.left = `${leftPosition}px`;
+                bar.style.width = `${barWidth}px`;
+                bar.style.top = `${visibleIndex * ROW_HEIGHT}px`; // Match position with the table row
+                bar.dataset.taskId = task.task_id;
+                
+                // Add hierarchy level to the bar for consistent styling
+                bar.dataset.hierarchyLevel = hierarchyLevel;
+                if (isParentTask) bar.classList.add('parent-task-bar');
+
+                // Add progress fill if applicable
+                if (task.phys_complete_pct > 0 && task.phys_complete_pct < 100 && !isMilestone) {
+                    const progressFill = document.createElement('div');
+                    progressFill.className = 'progress-fill';
+                    progressFill.style.width = `${task.phys_complete_pct}%`;
+                    bar.appendChild(progressFill);
+                }
+
+                // Add label for wider bars
+                if (barWidth > 60 && !isMilestone) {
+                    const label = document.createElement('div');
+                    label.className = 'bar-label';
+                    label.textContent = task.task_name;
+                    bar.appendChild(label);
+                }
+
+                // Add tooltip
+                bar.title = createTaskTooltip(task);
+
+                ganttBarsContainer.appendChild(bar);
+            });
+            
+            // Adjust timeline area height based on visible tasks
+            timelineArea.style.height = `${visibleTaskRows.length * ROW_HEIGHT}px`;
+            
+            // Handle dependency visibility
+            if (dependencyLinesContainer) {
+                dependencyLinesContainer.style.display = showDependencies ? 'block' : 'none';
+                
+                // Render dependencies if enabled
+                if (showDependencies) {
+                    renderDependencyLines();
+                }
+            }
+            
+            console.log('Gantt bars rendered for', visibleTaskRows.length, 'visible tasks');
+        }
+        
+        // Helper function to calculate indent level based on WBS hierarchy
+        function calculateIndentLevel(wbs, wbsMap) {
+            if (!wbs) return 0;
+            
+            let level = 0;
+            let currentWbs = wbs;
+            
+            while (currentWbs && currentWbs.parent_wbs_id) {
+                level++;
+                currentWbs = wbsMap.get(currentWbs.parent_wbs_id);
+            }
+            
+            return level;
+        }
+        
+        // Helper function to check if a task has child tasks
+        function hasChildTasks(task, tasksByWbs) {
+            // A task might be a summary/parent task if there are other tasks with this task's WBS as their parent
+            // This is a simplified approach - in real systems the parent-child relationship might be more complex
+            if (!task || !task.wbs_id) return false;
+            
+            // Check if this task is the only one in its WBS (not a summary)
+            const tasksInSameWbs = tasksByWbs[task.wbs_id] || [];
+            if (tasksInSameWbs.length <= 1) return false;
+            
+            // Check if this is the summary task for the WBS (usually first in the list)
+            return tasksInSameWbs.indexOf(task) === 0;
+        }
+        
+        // Render dependency lines between tasks
+        function renderDependencyLines() {
+            console.log('Rendering dependency lines...');
+            const dependencyLinesContainer = document.getElementById('dependencyLines');
+            if (!dependencyLinesContainer) return;
+            
+            dependencyLinesContainer.innerHTML = '';
+            
+            if (!projectDependencies || projectDependencies.length === 0) {
+                console.log('No dependencies to render.');
+                return;
+            }
+            
+            // Define row height constant for consistency
+            const ROW_HEIGHT = 30; // Match with CSS value
+            
+            console.log(`Rendering ${projectDependencies.length} dependencies...`);
+            
+            // Create a map of task IDs to their rendered bar elements
+            const taskBarsMap = new Map();
+            const taskBars = document.querySelectorAll('.gantt-bar');
+            
+            taskBars.forEach(bar => {
+                const taskId = bar.dataset.taskId;
+                if (taskId) {
+                    taskBarsMap.set(taskId, bar);
+                }
+            });
+            
+            // Process dependencies
+            projectDependencies.forEach(dependency => {
+                const predTaskId = dependency.pred_task_id;
+                const succTaskId = dependency.task_id;
+                
+                // Skip if either task is not in the current view
+                if (!predTaskId || !succTaskId) return;
+                
+                const predBar = taskBarsMap.get(predTaskId);
+                const succBar = taskBarsMap.get(succTaskId);
+                
+                if (!predBar || !succBar) {
+                    // Skip dependencies where either task bar is not rendered
+                    return;
+                }
+                
+                // Calculate positions
+                const predRect = predBar.getBoundingClientRect();
+                const succRect = succBar.getBoundingClientRect();
+                
+                const predLeft = parseFloat(predBar.style.left) || 0;
+                const predWidth = parseFloat(predBar.style.width) || 0;
+                const predTop = parseFloat(predBar.style.top) || 0;
+                const predHeight = predBar.classList.contains('milestone') ? 12 : (predBar.offsetHeight || 18);
+                
+                const succLeft = parseFloat(succBar.style.left) || 0;
+                const succTop = parseFloat(succBar.style.top) || 0;
+                const succHeight = succBar.classList.contains('milestone') ? 12 : (succBar.offsetHeight || 18);
+                
+                // Calculate connection points based on dependency type (using Finish-to-Start by default)
+                const startX = predLeft + predWidth;                // Right side of predecessor
+                const startY = predTop + (predHeight / 2);          // Middle of predecessor
+                const endX = succLeft;                              // Left side of successor
+                const endY = succTop + (succHeight / 2);            // Middle of successor
+                
+                // Skip if there's no horizontal distance between tasks
+                if (startX >= endX) return;
+                
+                // Horizontal line from predecessor
+                const hLine1 = document.createElement('div');
+                hLine1.className = 'dependency-line';
+                hLine1.style.left = `${startX}px`;
+                hLine1.style.top = `${startY}px`;
+                
+                // Calculate the horizontal distance between tasks and adjust connector positions
+                const horizontalDistance = endX - startX;
+                const buffer = 4; // Buffer space for aesthetics
+                
+                // Determine midpoint for the vertical connector
+                const midX = startX + (horizontalDistance / 2);
+                
+                // Set width for the first horizontal line
+                hLine1.style.width = `${(midX - startX) - buffer}px`;
+                
+                // Vertical connecting line
+                const vLine = document.createElement('div');
+                vLine.className = 'dependency-line vertical';
+                vLine.style.left = `${midX}px`;
+                
+                // Set vertical position and height
+                if (startY < endY) {
+                    vLine.style.top = `${startY}px`;
+                    vLine.style.height = `${endY - startY}px`;
+                } else {
+                    vLine.style.top = `${endY}px`;
+                    vLine.style.height = `${startY - endY}px`;
+                }
+                
+                // Horizontal line to successor
+                const hLine2 = document.createElement('div');
+                hLine2.className = 'dependency-line';
+                hLine2.style.left = `${midX + buffer}px`;
+                hLine2.style.top = `${endY}px`;
+                hLine2.style.width = `${endX - midX - buffer}px`;
+                
+                // Add arrow at the end
+                const arrow = document.createElement('div');
+                arrow.className = 'dependency-arrow';
+                arrow.style.left = `${endX - 6}px`;
+                arrow.style.top = `${endY - 4}px`;
+                
+                // Add all components to container
+                dependencyLinesContainer.appendChild(hLine1);
+                dependencyLinesContainer.appendChild(vLine);
+                dependencyLinesContainer.appendChild(hLine2);
+                dependencyLinesContainer.appendChild(arrow);
+            });
+            
+            console.log('Dependency lines rendered.');
+        }
+
+        // Create Task Tooltip
+        function createTaskTooltip(task) {
+            const wbsInfo = projectWBS.find(wbs => wbs.wbs_id === task.wbs_id);
+            const wbsName = wbsInfo ? wbsInfo.wbs_name : '';
+            
+            return `${task.task_name || 'Unnamed Task'}\n` +
+                   `WBS: ${wbsName}\n` +
+                   `Start: ${formatDate(getTaskStartDate(task))}\n` +
+                   `Finish: ${formatDate(getTaskEndDate(task))}\n` +
+                   `Duration: ${task.target_drtn_hr_cnt ? `${Math.round(task.target_drtn_hr_cnt / 8)}d` : ''}\n` +
+                   `Progress: ${Math.round(task.phys_complete_pct) || 0}%\n` +
+                   `Resources: ${task.assignedResources || 'None'}\n` +
+                   `${task.driving_path_flag === 'Y' ? 'CRITICAL PATH TASK' : ''}`;
+        }
+
+        // Task Selection
+        function toggleTaskSelection(taskId, rowElement) {
+            if (selectedTasks.has(taskId)) {
+                selectedTasks.delete(taskId);
+                rowElement.classList.remove('selected');
+            } else {
+                selectedTasks.add(taskId);
+                rowElement.classList.add('selected');
+            }
+        }
+
+        // Event Handlers
+        function setupEventHandlers() {
+            console.log('🔧 Setting up event handlers...');
+
+            // Project selection
+            document.getElementById('projectSelect').addEventListener('change', async (e) => {
+                if (e.target.value) {
+                    const selectedOption = e.target.selectedOptions[0];
+                    const projectName = selectedOption.dataset.projectName || e.target.value;
+                    await loadProjectData(e.target.value, projectName);
+                }
+            });
+
+            // View filters
+            const showCriticalBtn = document.getElementById('showCritical');
+            if (showCriticalBtn) {
+                showCriticalBtn.addEventListener('click', () => {
+                    showCriticalBtn.classList.toggle('active');
+                    applyViewFilters();
+                });
+            }
+            
+            const showProgressBtn = document.getElementById('showProgress');
+            if (showProgressBtn) {
+                showProgressBtn.addEventListener('click', () => {
+                    showProgressBtn.classList.toggle('active');
+                    document.body.classList.toggle('hide-progress', !showProgressBtn.classList.contains('active'));
+                    renderGanttBars(); // Re-render bars based on new filter state
+                });
+            }
+            
+            const showDependenciesBtn = document.getElementById('showDependencies');
+            if (showDependenciesBtn) {
+                showDependenciesBtn.addEventListener('click', () => {
+                    showDependenciesBtn.classList.toggle('active');
+                    const showDependencies = showDependenciesBtn.classList.contains('active');
+                    
+                    // Toggle visibility of dependency lines container
+                    const dependencyLinesContainer = document.getElementById('dependencyLines');
+                    if (dependencyLinesContainer) {
+                        dependencyLinesContainer.style.display = showDependencies ? 'block' : 'none';
+                    }
+                    
+                    // Render dependencies if they're now visible
+                    if (showDependencies) {
+                        renderDependencyLines();
+                    } else {
+                        // Clear dependencies if hidden
+                        if (dependencyLinesContainer) {
+                            dependencyLinesContainer.innerHTML = '';
+                        }
+                    }
+                    console.log(`Dependencies display ${showDependencies ? 'enabled' : 'disabled'}`);
+                });
+            }
+            
+            const showWbsOnlyBtn = document.getElementById('showWbsOnly');
+            if (showWbsOnlyBtn) {
+                showWbsOnlyBtn.addEventListener('click', async () => {
+                    showWbsOnlyBtn.classList.toggle('active');
+                    // Reload the current project data to apply the WBS filter
+                    if (currentProject && currentProject.id) {
+                        await loadProjectData(currentProject.id, currentProject.name);
+                    }
+                });
+            }
+
+            // Zoom controls
+            document.getElementById('zoomIn').addEventListener('click', () => {
+                timelineScale = Math.min(timelineScale * 1.25, 2);
+                renderTimelineHeader();
+                renderGanttBars();
+            });
+
+            document.getElementById('zoomOut').addEventListener('click', () => {
+                timelineScale = Math.max(timelineScale / 1.25, 0.5);
+                renderTimelineHeader();
+                renderGanttBars();
+            });
+
+            document.getElementById('fitView').addEventListener('click', fitTimelineToView);
+
+            // Synchronized scrolling
+            const tableBody = document.querySelector('.table-body');
+            const timelineAreaContainer = document.getElementById('timeline-area-container');
+            const timelineHeaderContainer = document.getElementById('timeline-header-container');
+            
+            if (tableBody && timelineAreaContainer) {
+                // Sync vertical scrolling between task table and Gantt chart
+                tableBody.addEventListener('scroll', () => {
+                    timelineAreaContainer.scrollTop = tableBody.scrollTop;
+                });
+                
+                timelineAreaContainer.addEventListener('scroll', () => {
+                    tableBody.scrollTop = timelineAreaContainer.scrollTop;
+                    
+                    // Sync horizontal scrolling between timeline area and header
+                    if (timelineHeaderContainer) {
+                        timelineHeaderContainer.scrollLeft = timelineAreaContainer.scrollLeft;
+                    }
+                });
+            }
+
+            // Keyboard shortcuts
+            document.addEventListener('keydown', handleKeyboardShortcuts);
+
+            // Window resize
+            window.addEventListener('resize', debounce(() => {
+                renderTimelineHeader();
+                renderGanttBars();
+            }, 300));
+            
+            // Task expand/collapse (delegation)
+            document.getElementById('task-table-body').addEventListener('click', (e) => {
+                if (e.target.classList.contains('task-expand-icon')) {
+                    const taskRow = e.target.closest('tr');
+                    if (taskRow) {
+                        toggleTaskChildren(taskRow);
+                    }
+                }
+            });
+            
+            // Setup table resizing
+            setupTableResizing();
+            
+            // Ensure dependencies are shown if the button is active
+            if (document.getElementById('showDependencies') && 
+                document.getElementById('showDependencies').classList.contains('active')) {
+                setTimeout(renderDependencyLines, 100); // Small delay to ensure Gantt bars are rendered
+            }
+            
+            console.log('Event handlers setup.');
+        }
+        
+        // Set up table resizing functionality
+        function setupTableResizing() {
+            const tableContainer = document.getElementById('task-table-container');
+            const resizer = document.getElementById('table-resizer');
+            const ganttChartContainer = document.getElementById('gantt-chart-container');
+            
+            if (!tableContainer || !resizer || !ganttChartContainer) return;
+            
+            let isResizing = false;
+            let startX, startWidth;
+            
+            resizer.addEventListener('mousedown', (e) => {
+                isResizing = true;
+                resizer.classList.add('active');
+                startX = e.clientX;
+                startWidth = tableContainer.offsetWidth;
+                
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+                
+                // Prevent text selection during resize
+                document.body.style.userSelect = 'none';
+                e.preventDefault();
+            });
+            
+            function onMouseMove(e) {
+                if (!isResizing) return;
+                
+                const newWidth = startWidth + (e.clientX - startX);
+                if (newWidth > 200 && newWidth < window.innerWidth - 200) {
+                    tableContainer.style.width = `${newWidth}px`;
+                }
+            }
+            
+            function onMouseUp() {
+                isResizing = false;
+                resizer.classList.remove('active');
+                
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+                document.body.style.userSelect = '';
+                
+                // Trigger re-render to adjust Gantt chart
+                renderTimelineHeader();
+                renderGanttBars();
+            }
+            
+            // Setup synchronized horizontal scrolling for table header and body
+            const tableHeader = document.querySelector('.table-header');
+            const tableBody = document.querySelector('.table-body');
+            
+            if (tableHeader && tableBody) {
+                tableBody.addEventListener('scroll', () => {
+                    tableHeader.scrollLeft = tableBody.scrollLeft;
+                });
+                
+                tableHeader.addEventListener('scroll', () => {
+                    tableBody.scrollLeft = tableHeader.scrollLeft;
+                });
+            }
+            
+            // Make table columns resizable
+            const tableHeaders = document.querySelectorAll('.task-table th');
+            tableHeaders.forEach(th => {
+                th.addEventListener('mousedown', (e) => {
+                    if (e.offsetX > th.offsetWidth - 10) {
+                        // Only handle click on the right edge
+                        const startWidth = th.offsetWidth;
+                        const startX = e.clientX;
+                        
+                        function onColumnResize(e) {
+                            const newWidth = startWidth + (e.clientX - startX);
+                            if (newWidth > 50) {
+                                th.style.width = `${newWidth}px`;
+                                // Find corresponding column in other table
+                                const index = Array.from(th.parentNode.children).indexOf(th);
+                                const tables = document.querySelectorAll('.task-table');
+                                tables.forEach(table => {
+                                    const headerRow = table.querySelector('tr');
+                                    if (headerRow && headerRow !== th.parentNode) {
+                                        const correspondingTh = headerRow.children[index];
+                                        if (correspondingTh) {
+                                            correspondingTh.style.width = `${newWidth}px`;
+                                        }
+                                    }
+                                });
+                            }
+                        }
+                        
+                        function onColumnResizeEnd() {
+                            document.removeEventListener('mousemove', onColumnResize);
+                            document.removeEventListener('mouseup', onColumnResizeEnd);
+                            document.body.style.userSelect = '';
+                        }
+                        
+                        document.addEventListener('mousemove', onColumnResize);
+                        document.addEventListener('mouseup', onColumnResizeEnd);
+                        document.body.style.userSelect = 'none';
+                        e.preventDefault();
+                    }
+                });
+            });
+        }
+
+        // Toggle visibility of child tasks
+        function toggleTaskChildren(taskRow) {
+            // Implementation would depend on how task hierarchy is structured
+            // For now, just toggle the icon
+            const expandIcon = taskRow.querySelector('.task-expand-icon');
+            if (expandIcon) {
+                expandIcon.textContent = expandIcon.textContent === '▼' ? '►' : '▼';
+            }
+            
+            // In a real implementation, you would find child tasks and toggle their visibility
+            console.log(`Toggle children for task: ${taskRow.dataset.taskId}`);
+        }
+
+        // Apply View Filters
+        function applyViewFilters() {
+            console.log('Applying view filters...');
+            const showCriticalOnly = document.getElementById('showCritical') && 
+                                     document.getElementById('showCritical').classList.contains('active');
+            const showDependencies = document.getElementById('showDependencies') && 
+                                     document.getElementById('showDependencies').classList.contains('active');
+            
+            // When filters change, re-render both the table and chart for complete synchronization
+            renderTaskTable();
+            renderGanttBars();
+            
+            // Render dependencies if they should be visible
+            if (showDependencies) {
+                setTimeout(() => {
+                    renderDependencyLines();
+                }, 100); // Small delay to ensure Gantt bars are properly rendered first
+            }
+            
+            console.log('View filters applied. Table and Gantt chart synchronized.');
+        }
+
+        // Fit Timeline to View
+        function fitTimelineToView() {
+            console.log('Fitting timeline to view...');
+            if (!projectStartDate || !projectEndDate) return;
+
+            const timelineArea = document.getElementById('timelineArea');
+            const availableWidth = timelineArea.clientWidth - 40;
+            const projectDays = (projectEndDate - projectStartDate) / (1000 * 60 * 60 * 24);
+            
+            if (projectDays > 0) {
+                timelineScale = Math.max(0.25, Math.min(4, availableWidth / (projectDays * 4)));
+                renderTimelineHeader();
+                renderGanttBars();
+            }
+             console.log('Timeline fitted to view.');
+        }
+
+        // Keyboard Shortcuts
+        function handleKeyboardShortcuts(e) {
+            // console.log('Keyboard shortcut pressed:', e.key);
+            if (e.ctrlKey || e.metaKey) {
+                switch (e.key) {
+                    case '=':
+                    case '+':
+                        e.preventDefault();
+                        document.getElementById('zoomIn').click();
+                        break;
+                    case '-':
+                        e.preventDefault();
+                        document.getElementById('zoomOut').click();
+                        break;
+                    case '0':
+                        e.preventDefault();
+                        fitTimelineToView();
+                        break;
+                }
+            }
+        }
+
+        // Utility Functions
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        async function fetchAPI(endpoint) {
+            console.log(`Fetching API endpoint: ${API_BASE}${endpoint}`);
+            const response = await fetch(`${API_BASE}${endpoint}`);
+            if (!response.ok) {
+                throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+            }
+            const data = await response.json();
+            console.log(`Received data from ${endpoint}:`, data);
+            return data;
+        }
+
+        // Loading and Error States
+        function showLoadingState(message) {
+            console.log('Showing loading state:', message);
+            const statusMessagesDiv = document.getElementById('status-messages');
+            if(statusMessagesDiv) {
+                statusMessagesDiv.style.display = 'block';
+                statusMessagesDiv.innerHTML = `
+                <div class="loading-state">
+                    <div class="loading-spinner"></div>
+                    <div>${message}</div>
+                </div>
+            `;
+            }
+        }
+
+        function showErrorState(title, message) {
+             console.error('Showing error state:', title, message);
+            const statusMessagesDiv = document.getElementById('status-messages');
+             if(statusMessagesDiv) {
+                 statusMessagesDiv.style.display = 'block';
+                 statusMessagesDiv.innerHTML = `
+                <div class="error-state">
+                    <div class="error-title">⚠️ ${title}</div>
+                    <div class="error-message">${message}</div>
+                    <div class="error-details">
+                        <strong>Troubleshooting:</strong><br>
+                        • Ensure the server is running on localhost:3000<br>
+                        • Check database file path: C:/Users/shrey/Documents/BIM_XER_Masher/database/primavera_p6.db<br>
+                        • Verify network connectivity<br>
+                        • Check browser console for detailed errors
+                    </div>
+                </div>
+            `;
+            }
+        }
+
+        // Function to hide status messages
+        function hideStatusMessages(){
+            const statusMessagesDiv = document.getElementById('status-messages');
+            if(statusMessagesDiv) {
+                statusMessagesDiv.style.display = 'none';
+                statusMessagesDiv.innerHTML = '';
+            }
+        }
+
+        // Debug Tools
+        window.ProcoreGantt = {
+            getTasks: () => projectTasks,
+            getWBS: () => projectWBS,
+            getDependencies: () => projectDependencies,
+            getResources: () => projectResources,
+            getCurrentProject: () => currentProject,
+            getTimelineScale: () => timelineScale,
+            refreshProject: () => currentProject && loadProjectData(currentProject.id, currentProject.name), // Pass id and name
+            exportProjectData: () => {
+                const data = {
+                    project: currentProject,
+                    tasks: projectTasks,
+                    wbs: projectWBS,
+                    dependencies: projectDependencies,
+                    resources: projectResources,
+                    timeline: { start: projectStartDate, end: projectEndDate, scale: timelineScale }
+                };
+                console.log('📊 Project Data Export:', data);
+                return data;
+            },
+            setTimelineScale: (scale) => {
+                timelineScale = Math.max(0.25, Math.min(4, scale));
+                renderTimelineHeader();
+                renderGanttBars();
+            },
+            // Add a helper to manually load data for a project ID
+            loadProjectById: async (projectId) => {
+                await loadProjectData(projectId, `Project ${projectId}`); // Use generic name if not available
+            }
+        };
+
+        // Initial Load
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('DOM Content Loaded. Starting initial load...');
+            showLoadingState('Loading projects...');
+            loadProjects();
+            
+            // Initialize dependencies based on button state
+            const showDependenciesBtn = document.getElementById('showDependencies');
+            if (showDependenciesBtn) {
+                // Set initial state of dependency lines container
+                const initialShowDependencies = showDependenciesBtn.classList.contains('active');
+                const dependencyLinesContainer = document.getElementById('dependencyLines');
+                if (dependencyLinesContainer) {
+                    dependencyLinesContainer.style.display = initialShowDependencies ? 'block' : 'none';
+                }
+            }
+            
+            // Add a small delay before setting up event handlers
+            setTimeout(setupEventHandlers, 100);
+            
+            console.log('Initial load functions called.');
+        });
+
+        // Error handling for unhandled promises
+        window.addEventListener('unhandledrejection', (event) => {
+            console.error('🚨 Unhandled promise rejection:', event.reason);
+            // updateConnectionStatus('error', 'Connection error occurred'); // This function doesn't exist, remove or implement
+            showErrorState('Unhandled Promise Rejection', event.reason.message || event.reason);
+        });
+
+    </script>
+</body>
+</html>

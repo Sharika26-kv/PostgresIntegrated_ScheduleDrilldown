@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Version History - Tool Name</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="dashboard.css">
+    <link rel="stylesheet" href="css/sidebar.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- Add any page-specific CSS here -->
+</head>
+<body class="bg-gray-100 font-sans leading-normal tracking-normal">
+    <!-- Sidebar Toggle Button -->
+    <button class="sidebar-toggle">
+        <i class="fas fa-chevron-left"></i>
+    </button>
+    
+    <div class="flex h-screen bg-gray-100">
+        <!-- Sidebar -->
+        <div class="sidebar bg-blue-900 text-white px-6 py-8 overflow-y-auto flex flex-col expanded">
+            <div class="flex items-center mb-8">
+                <i class="fas fa-building mr-2 text-2xl"></i>
+                <span class="text-xl font-bold nav-text">NIRMAN</span>
+            </div>
+
+            <nav class="flex-grow">
+                <p class="text-gray-400 text-xs uppercase tracking-wider mb-4 nav-label">Main Navigation</p>
+                <a href="settings.html" class="nav-link flex items-center py-2 px-4 rounded text-gray-300 hover:bg-blue-800 hover:text-white mb-2">
+                    <i class="fas fa-tachometer-alt mr-2"></i> 
+                    <span class="nav-text">Dashboard</span>
+                </a>
+                <a href="portfolio-management.html" class="nav-link flex items-center py-2 px-4 rounded text-gray-300 hover:bg-blue-800 hover:text-white mb-2">
+                    <i class="fas fa-briefcase mr-2"></i> 
+                    <span class="nav-text">Portfolio Management</span>
+                </a>
+                <a href="compliance.html" class="nav-link flex items-center py-2 px-4 rounded text-gray-300 hover:bg-blue-800 hover:text-white mb-2">
+                    <i class="fas fa-shield-alt mr-2"></i> 
+                    <span class="nav-text">Compliance</span>
+                </a>
+                <a href="schedule.html" class="nav-link flex items-center py-2 px-4 rounded text-gray-300 hover:bg-blue-800 hover:text-white mb-2">
+                    <i class="fas fa-calendar mr-2"></i> 
+                    <span class="nav-text">Schedule Analytics (WBS)</span>
+                </a>
+                                    <a href="schedule_awp_fresh.html" class="nav-link flex items-center py-2 px-4 rounded text-gray-300 hover:bg-blue-800 hover:text-white mb-2 transition-colors duration-200">
+                        <i class="fas fa-tasks mr-2"></i> 
+                        <span class="nav-text">Schedule Analytics (AWP)</span>
+                    </a>
+                    <a href="schedule-drilldown.html" class="nav-link flex items-center py-2 px-4 rounded text-gray-300 hover:bg-blue-800 hover:text-white mb-2 transition-colors duration-200">
+                        <i class="fas fa-search-plus mr-2"></i> 
+                        <span class="nav-text">Schedule Drilldown</span>
+                    </a>
+                <a href="3d-model.html" class="nav-link flex items-center py-2 px-4 rounded text-gray-300 hover:bg-blue-800 hover:text-white mb-2">
+                    <i class="fas fa-cube mr-2"></i> 
+                    <span class="nav-text">3D Model</span>
+                </a>
+                <a href="https://login-sandbox.procore.com/" target="_blank" class="nav-link flex items-center py-2 px-4 rounded text-gray-300 hover:bg-blue-800 hover:text-white mb-2">
+                    <i class="fas fa-external-link-alt mr-2"></i> 
+                    <span class="nav-text">Go to Procore</span>
+                </a>
+                <a href="version-history.html" class="nav-link flex items-center py-2 px-4 rounded bg-blue-800 text-white mb-2">
+                    <i class="fas fa-history mr-2"></i> 
+                    <span class="nav-text">Version History</span>
+                </a>
+                <a href="upload.html" class="nav-link flex items-center py-2 px-4 rounded text-gray-300 hover:bg-blue-800 hover:text-white mb-2">
+                    <i class="fas fa-upload mr-2"></i> 
+                    <span class="nav-text">Insert to DB</span>
+                </a>
+                <a href="chat.html" class="nav-link flex items-center py-2 px-4 rounded text-gray-300 hover:bg-blue-800 hover:text-white mb-2">
+                    <i class="fas fa-comments mr-2"></i> 
+                    <span class="nav-text">Chat</span>
+                </a>
+            </nav>
+
+            <div class="mt-auto pt-8">
+                <a href="index.html" class="nav-link flex items-center py-2 px-4 rounded text-gray-300 hover:bg-blue-800 hover:text-white">
+                    <i class="fas fa-sign-out-alt mr-2"></i> 
+                    <span class="nav-text">Log Out</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content flex-1 overflow-x-hidden overflow-y-auto sidebar-expanded">
+            <!-- Top Navigation -->
+            <header class="bg-white shadow-sm">
+                 <div class="flex items-center justify-between px-6 py-4">
+                    <div>
+                         <h1 class="text-2xl font-bold text-gray-800">Project Version History</h1>
+                         <p class="text-sm text-gray-600">Track changes and revisions</p>
+                    </div>
+                     <div class="flex items-center">
+                        <div class="text-sm text-gray-600 mr-4">
+                            <span class="font-medium">Project ID:</span> <span id="currentProjectId">P1000</span> <!-- Needs JS update -->
+                        </div>
+                        <div class="flex items-center">
+                            <div class="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold mr-2">
+                                US
+                            </div>
+                            <span class="text-gray-800">User</span>
+                        </div>
+                    </div>
+                </div>
+                 <!-- Project Filter -->
+                <div class="border-t border-gray-200 px-6 py-3 bg-gray-50 project-filter-container">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <label for="projectFilter" class="text-sm font-medium text-gray-700 mr-2">Project:</label>
+                            <select id="projectFilter" class="px-4 py-2 border border-gray-300 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                <option value="datacenter">DataCenter Project</option>
+                            </select>
+                            <button id="refreshProjectBtn" class="ml-2 bg-blue-600 text-white px-3 py-2 rounded-lg text-sm">
+                                <i class="fas fa-sync-alt mr-1"></i> Load
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Main Content Area -->
+            <main class="p-6">
+                <h2 class="text-xl font-semibold mb-4">Version History</h2>
+                <!-- Placeholder for version history content -->
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <p class="text-gray-600">Details about project versions, upload dates, and changes will be listed here.</p>
+                    <!-- Add version history rendering logic -->
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Add any page-specific JS here -->
+    <script>
+        // Basic JS placeholder if needed
+        console.log("Version History page loaded");
+    </script>
+    
+    <!-- Sidebar functionality script -->
+    <script src="js/sidebar.js"></script>
+</body>
+</html> 

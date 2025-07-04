@@ -1,0 +1,1256 @@
+// Fresh AWP Schedule implementation with critical improvements
+// Global variables
+let awpData = [];
+let selectedAwpId = null; // Track selected AWP activity
+let filteredTasks = []; // Tasks for the selected AWP
+let hierarchicalData = []; // Combined hierarchy for display
+let currentProjectId = null;
+let timelineRange = { start: null, end: null };
+let expandedNodes = new Set();
+
+// Enhanced configuration
+const CONFIG = {
+    ROW_HEIGHT: 30, // Increased for better visibility
+    MIN_DAY_WIDTH: 30, // Minimum 30px per day for visibility
+    MAX_TIMELINE_DAYS: 365, // Maximum days to display
+    SHOW_DEPENDENCIES: false,
+    BAR_HEIGHT: 24, // Minimum bar height
+    BAR_MARGIN: 3, // Margin between bars
+    COLORS: {
+        ACTIVITY: '#3B82F6', // Blue for activities
+        TASK: '#10B981', // Green for tasks
+        CRITICAL: '#EF4444', // Red for critical path
+        COMPLETE: '#059669', // Green for completed
+        TODAY_LINE: '#DC2626', // Red for today line
+        PROGRESS: 'rgba(255, 255, 255, 0.3)' // Semi-transparent progress overlay
+    },
+    INDENT: {
+        ACTIVITY: 8,
+        TASK: 24
+    }
+};
+
+// Initialize when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 Fresh AWP Schedule implementation starting...');
+    
+    setupEventListeners();
+    setupResizeHandle();
+    loadProjects();
+    
+    console.log('✅ Initialization complete');
+});
+
+// Setup event listeners
+function setupEventListeners() {
+    // Project selection
+    const projectSelect = document.getElementById('projectSelect');
+    if (projectSelect) {
+        projectSelect.addEventListener('change', function() {
+            const projectId = this.value;
+            if (projectId) {
+                currentProjectId = projectId;
+                loadProjectData(projectId);
+            } else {
+                clearData();
+            }
+        });
+    }
+    
+    // Dependencies toggle
+    const toggleDependencies = document.getElementById('toggleDependencies');
+    if (toggleDependencies) {
+        toggleDependencies.addEventListener('click', function() {
+            CONFIG.SHOW_DEPENDENCIES = !CONFIG.SHOW_DEPENDENCIES;
+            this.textContent = CONFIG.SHOW_DEPENDENCIES ? 'Hide Dependencies' : 'Show Dependencies';
+            this.className = CONFIG.SHOW_DEPENDENCIES ? 
+                'px-3 py-2 bg-red-500 text-white text-sm rounded-lg hover:bg-red-600' : 
+                'px-3 py-2 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600';
+            renderGantt(); // Re-render with/without dependencies
+        });
+    }
+    
+    // Setup scroll synchronization
+    setupScrollSync();
+}
+
+// Setup resize handle for split panels
+function setupResizeHandle() {
+    const resizeHandle = document.getElementById('resizeHandle');
+    const tablePanel = document.querySelector('.table-panel');
+    const ganttPanel = document.querySelector('.gantt-panel');
+    
+    if (!resizeHandle || !tablePanel || !ganttPanel) return;
+    
+    let isResizing = false;
+    
+    resizeHandle.addEventListener('mousedown', function(e) {
+        isResizing = true;
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+        e.preventDefault();
+    });
+    
+    function handleMouseMove(e) {
+        if (!isResizing) return;
+        
+        const container = document.querySelector('.split-container');
+        const rect = container.getBoundingClientRect();
+        const percentage = ((e.clientX - rect.left) / rect.width) * 100;
+        
+        // Limit resize between 30% and 70%
+        const clampedPercentage = Math.max(30, Math.min(70, percentage));
+        
+        tablePanel.style.width = `${clampedPercentage}%`;
+    }
+    
+    function handleMouseUp() {
+        isResizing = false;
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+    }
+}
+
+// Setup scroll synchronization between table and gantt
+function setupScrollSync() {
+    const tableContent = document.querySelector('.table-content');
+    const ganttContent = document.querySelector('.gantt-content');
+    const ganttHeader = document.querySelector('.gantt-header');
+    
+    if (!tableContent || !ganttContent || !ganttHeader) return;
+    
+    let syncingScroll = false;
+    
+    tableContent.addEventListener('scroll', function() {
+        if (!syncingScroll) {
+            syncingScroll = true;
+            ganttContent.scrollTop = this.scrollTop;
+            setTimeout(() => syncingScroll = false, 10);
+        }
+    });
+    
+    ganttContent.addEventListener('scroll', function() {
+        if (!syncingScroll) {
+            syncingScroll = true;
+            // Sync vertical scroll with table
+            tableContent.scrollTop = this.scrollTop;
+            
+            // Sync horizontal scroll with header (but don't show header scrollbar)
+            ganttHeader.scrollLeft = this.scrollLeft;
+            
+            setTimeout(() => syncingScroll = false, 10);
+        }
+    });
+}
+
+// Load available projects
+async function loadProjects() {
+    try {
+        console.log('📡 Loading projects...');
+        
+        const response = await fetch('/api/gantt/projects');
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const projects = await response.json();
+        console.log(`✅ Loaded ${projects.length} projects`);
+        
+        const projectSelect = document.getElementById('projectSelect');
+        if (projectSelect) {
+            projectSelect.innerHTML = '<option value="">Select a project...</option>';
+            projects.forEach(project => {
+                const option = document.createElement('option');
+                option.value = project.proj_id;
+                option.textContent = `${project.proj_id} - ${project.proj_name || project.proj_short_name}`;
+                projectSelect.appendChild(option);
+            });
+        }
+        
+    } catch (error) {
+        console.error('❌ Error loading projects:', error);
+        showError('Could not load projects from server');
+    }
+}
+
+// Load project data using the correct API endpoints
+async function loadProjectData(projectId) {
+    try {
+        showLoading();
+        console.log(`📡 Loading AWP data for project ${projectId}...`);
+        
+        // Use the specified API endpoints
+        const [hierarchyResponse, tasksResponse, dependenciesResponse] = await Promise.all([
+            fetch(`/api/awp/projects/${projectId}/hierarchy`),
+            fetch(`/api/awp/projects/${projectId}/tasks`),
+            fetch(`/api/awp/projects/${projectId}/dependencies`)
+        ]);
+        
+        if (!hierarchyResponse.ok) {
+            throw new Error(`Hierarchy API failed: HTTP ${hierarchyResponse.status}: ${hierarchyResponse.statusText}`);
+        }
+        if (!tasksResponse.ok) {
+            throw new Error(`Tasks API failed: HTTP ${tasksResponse.status}: ${tasksResponse.statusText}`);
+        }
+        if (!dependenciesResponse.ok) {
+            throw new Error(`Dependencies API failed: HTTP ${dependenciesResponse.status}: ${dependenciesResponse.statusText}`);
+        }
+        
+        const [hierarchyData, tasksData, dependenciesData] = await Promise.all([
+            hierarchyResponse.json(),
+            tasksResponse.json(),
+            dependenciesResponse.json()
+        ]);
+        
+        console.log(`✅ Loaded ${hierarchyData.length} AWP hierarchy records`);
+        console.log(`✅ Loaded ${tasksData.length} task records`);
+        console.log(`✅ Loaded ${dependenciesData.length} dependency records`);
+        
+        // Store the data
+        awpData = hierarchyData;
+        window.tasksData = tasksData; // Store tasks data globally
+        window.dependenciesData = dependenciesData; // Store dependencies data globally
+        
+        processData();
+        renderAll();
+        
+    } catch (error) {
+        console.error('❌ Error loading project data:', error);
+        showError(`Failed to load project data: ${error.message}`);
+    }
+}
+
+// Process raw data with enhanced timeline calculation and hierarchy building
+function processData() {
+    console.log('🔍 Processing data with enhanced logic...', { 
+        totalHierarchyRecords: awpData.length,
+        totalTaskRecords: window.tasksData ? window.tasksData.length : 0,
+        totalDependencies: window.dependenciesData ? window.dependenciesData.length : 0
+    });
+    
+    // Calculate optimal timeline range from actual task dates
+    calculateOptimalTimelineRange();
+    
+    // Build enhanced hierarchy with ALL activities (including parents without direct tasks)
+    buildEnhancedHierarchy();
+}
+
+// FIXED: Calculate optimal timeline range from actual task data
+function calculateOptimalTimelineRange() {
+    console.log('🔍 Calculating optimal timeline range from task data...');
+    const allValidDates = [];
+    
+    // Collect all valid dates from tasks data
+    if (window.tasksData && window.tasksData.length > 0) {
+        window.tasksData.forEach(task => {
+            // Check all possible date fields and use the best available
+            const startDate = task.target_start_date || task.act_start_date || task.early_start_date;
+            const endDate = task.target_end_date || task.act_end_date || task.early_end_date;
+            
+            if (startDate) {
+                const date = new Date(startDate);
+                if (!isNaN(date) && date.getFullYear() > 1900 && date.getFullYear() < 3000) {
+                    allValidDates.push(date);
+                }
+            }
+            if (endDate) {
+                const date = new Date(endDate);
+                if (!isNaN(date) && date.getFullYear() > 1900 && date.getFullYear() < 3000) {
+                    allValidDates.push(date);
+                }
+            }
+        });
+    }
+    
+    console.log('📊 Found valid dates:', allValidDates.length, 'from', window.tasksData?.length || 0, 'tasks');
+    
+    if (allValidDates.length > 0) {
+        // Calculate actual project boundaries
+        timelineRange.start = new Date(Math.min(...allValidDates));
+        timelineRange.end = new Date(Math.max(...allValidDates));
+        
+        // Add minimal padding (1-2 weeks)
+        const projectSpan = timelineRange.end - timelineRange.start;
+        const paddingDays = Math.min(14, Math.max(7, Math.ceil(projectSpan / (1000 * 60 * 60 * 24)) * 0.02));
+        
+        timelineRange.start.setDate(timelineRange.start.getDate() - paddingDays);
+        timelineRange.end.setDate(timelineRange.end.getDate() + paddingDays);
+        
+        console.log('✅ Timeline range calculated from actual data:', {
+            originalStart: new Date(Math.min(...allValidDates)).toISOString().split('T')[0],
+            originalEnd: new Date(Math.max(...allValidDates)).toISOString().split('T')[0],
+            paddedStart: timelineRange.start.toISOString().split('T')[0],
+            paddedEnd: timelineRange.end.toISOString().split('T')[0],
+            totalDays: Math.ceil((timelineRange.end - timelineRange.start) / (1000 * 60 * 60 * 24)),
+            paddingDays: paddingDays
+        });
+    } else {
+        // Fallback to current date if no valid dates found
+        console.warn('⚠️ No valid task dates found, using fallback range');
+        timelineRange.start = new Date();
+        timelineRange.end = new Date();
+        timelineRange.end.setMonth(timelineRange.end.getMonth() + 3);
+    }
+}
+
+// Build enhanced hierarchy with ALL activities (including parents without direct tasks)
+function buildEnhancedHierarchy() {
+    console.log('🏗️ Building enhanced hierarchy...');
+    hierarchicalData = [];
+    
+    if (!awpData.length) {
+        console.warn('⚠️ No AWP data to process');
+        updateCountDisplay();
+        return;
+    }
+    
+    // Group tasks by AWP activity
+    const tasksByActivity = new Map();
+    if (window.tasksData) {
+        window.tasksData.forEach(task => {
+            const activityId = task.actv_code_id;
+            if (!tasksByActivity.has(activityId)) {
+                tasksByActivity.set(activityId, []);
+            }
+            tasksByActivity.get(activityId).push(task);
+        });
+    }
+    
+    // Helper function to get all descendant tasks for an activity (recursive)
+    function getAllDescendantTasks(activityId) {
+        const allTasks = [];
+        
+        // Get direct tasks
+        const directTasks = tasksByActivity.get(activityId) || [];
+        allTasks.push(...directTasks);
+        
+        // Get tasks from child activities
+        const childActivities = awpData.filter(child => child.parent_actv_code_id === activityId);
+        childActivities.forEach(child => {
+            const childTasks = getAllDescendantTasks(child.actv_code_id);
+            allTasks.push(...childTasks);
+        });
+        
+        return allTasks;
+    }
+    
+    // FIXED: Build hierarchy recursively to maintain parent-child order
+    function buildHierarchyRecursively(parentId = null, currentLevel = 1) {
+        // Find activities at this level
+        const activitiesAtLevel = awpData.filter(activity => {
+            if (parentId === null) {
+                return !activity.parent_actv_code_id || activity.parent_actv_code_id === '';
+            } else {
+                return activity.parent_actv_code_id === parentId;
+            }
+        });
+        
+        // Sort activities at this level by sequence
+        activitiesAtLevel.sort((a, b) => {
+            const seqA = parseFloat(a.sequence || a.seq_num || 0);
+            const seqB = parseFloat(b.sequence || b.seq_num || 0);
+            return seqA - seqB;
+        });
+        
+        activitiesAtLevel.forEach(activity => {
+            const directTasks = tasksByActivity.get(activity.actv_code_id) || [];
+            const allDescendantTasks = getAllDescendantTasks(activity.actv_code_id);
+            
+            // Calculate activity dates from ALL descendant tasks
+            const startDates = [];
+            const endDates = [];
+            
+            allDescendantTasks.forEach(task => {
+                // Get best available start date
+                const startDate = task.target_start_date || task.act_start_date || task.early_start_date;
+                if (startDate) {
+                    const date = new Date(startDate);
+                    if (!isNaN(date)) startDates.push(date);
+                }
+                
+                // Get best available end date  
+                const endDate = task.target_end_date || task.act_end_date || task.early_end_date;
+                if (endDate) {
+                    const date = new Date(endDate);
+                    if (!isNaN(date)) endDates.push(date);
+                }
+            });
+            
+            console.log(`📅 Activity ${activity.Activity_code || activity.actv_code_id} (Level ${currentLevel}):`, {
+                directTaskCount: directTasks.length,
+                totalDescendantTasks: allDescendantTasks.length,
+                isExpanded: expandedNodes.has(activity.actv_code_id),
+                startDatesFound: startDates.length,
+                endDatesFound: endDates.length
+            });
+            
+            // Enhanced activity object - always include all activities
+            const enhancedActivity = {
+                ...activity,
+                type: 'activity',
+                isExpanded: expandedNodes.has(activity.actv_code_id),
+                Activity_code: activity.Activity_code || activity.actv_code_id || activity.short_name,
+                Activity_name: activity.Activity_name || activity.actv_code_name || 'Unnamed Activity',
+                level: currentLevel,
+                taskCount: allDescendantTasks.length, // Total descendant tasks
+                directTaskCount: directTasks.length, // Direct tasks only
+                calculated_start_date: startDates.length > 0 ? new Date(Math.min(...startDates)) : null,
+                calculated_end_date: endDates.length > 0 ? new Date(Math.max(...endDates)) : null,
+                progress: allDescendantTasks.length > 0 ? calculateActivityProgress(allDescendantTasks) : 0,
+                hasCriticalPath: allDescendantTasks.some(task => task.driving_path_flag === 'Y'),
+                hasDirectTasks: directTasks.length > 0,
+                hasDescendantTasks: allDescendantTasks.length > 0
+            };
+            
+            // Add the activity to hierarchy
+            hierarchicalData.push(enhancedActivity);
+            
+            // FIXED: Add direct tasks immediately after the activity if expanded
+            if (enhancedActivity.isExpanded && directTasks.length > 0) {
+                directTasks.forEach(task => {
+                    const enhancedTask = {
+                        ...task,
+                        type: 'task',
+                        Activity_code: task.task_code,
+                        Activity_name: task.task_name,
+                        level: currentLevel + 1,
+                        parent_actv_code_id: activity.actv_code_id,
+                        // Store raw date fields for bar rendering
+                        target_start_date: task.target_start_date,
+                        target_end_date: task.target_end_date,
+                        act_start_date: task.act_start_date,
+                        act_end_date: task.act_end_date,
+                        early_start_date: task.early_start_date,
+                        early_end_date: task.early_end_date,
+                        duration_days: calculateTaskDuration(task),
+                        progress: task.phys_complete_pct || 0,
+                        isCritical: task.driving_path_flag === 'Y'
+                    };
+                    hierarchicalData.push(enhancedTask);
+                });
+            }
+            
+            // Recursively build child activities (but only if activity is expanded)
+            if (enhancedActivity.isExpanded) {
+                buildHierarchyRecursively(activity.actv_code_id, currentLevel + 1);
+            }
+        });
+    }
+    
+    // Start building from root level
+    buildHierarchyRecursively();
+    
+    console.log('✅ Enhanced hierarchy built with proper parent-child order:', {
+        totalItems: hierarchicalData.length,
+        activities: hierarchicalData.filter(item => item.type === 'activity').length,
+        activitiesWithDirectTasks: hierarchicalData.filter(item => item.type === 'activity' && item.hasDirectTasks).length,
+        activitiesWithDescendantTasks: hierarchicalData.filter(item => item.type === 'activity' && item.hasDescendantTasks).length,
+        activitiesWithoutTasks: hierarchicalData.filter(item => item.type === 'activity' && !item.hasDescendantTasks).length,
+        tasks: hierarchicalData.filter(item => item.type === 'task').length,
+        expandedActivities: Array.from(expandedNodes)
+    });
+    
+    updateCountDisplay();
+}
+
+// Calculate activity progress from child tasks
+function calculateActivityProgress(tasks) {
+    if (!tasks || tasks.length === 0) return 0;
+    
+    const totalProgress = tasks.reduce((sum, task) => {
+        return sum + (parseFloat(task.phys_complete_pct) || 0);
+    }, 0);
+    
+    return Math.round(totalProgress / tasks.length);
+}
+
+// Calculate task duration in days
+function calculateTaskDuration(task) {
+    // First try using target_drtn_hr_cnt (convert hours to days)
+    if (task.target_drtn_hr_cnt) {
+        return Math.ceil(parseFloat(task.target_drtn_hr_cnt) / 8); // 8 hours per day
+    }
+    
+    // Fallback to date difference
+    const startDate = new Date(task.act_start_date || task.target_start_date || task.early_start_date);
+    const endDate = new Date(task.act_end_date || task.target_end_date || task.early_end_date);
+    
+    if (!isNaN(startDate) && !isNaN(endDate)) {
+        return Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) || 1;
+    }
+    
+    return 1; // Default to 1 day
+}
+
+// Render all components
+function renderAll() {
+    renderTable();
+    renderGanttHeader();
+    renderGantt();
+}
+
+// Enhanced table rendering with hierarchy support
+function renderTable() {
+    const tableBody = document.getElementById('tableBody');
+    if (!tableBody) return;
+    
+    console.log('🔄 Rendering enhanced table with', hierarchicalData.length, 'items');
+    
+    tableBody.innerHTML = '';
+    
+    if (hierarchicalData.length === 0) {
+        const row = document.createElement('tr');
+        row.innerHTML = '<td colspan="6" style="padding: 20px; text-align: center; color: #6b7280;">No activities with tasks found</td>';
+        tableBody.appendChild(row);
+        return;
+    }
+    
+    hierarchicalData.forEach((item, index) => {
+        const row = document.createElement('tr');
+        row.className = `${item.type === 'activity' ? 'awp-row' : 'task-row'} clickable-row`;
+        row.style.height = `${CONFIG.ROW_HEIGHT}px`;
+        row.dataset.itemIndex = index; // Store index for focusing
+        
+        // Styling based on item type
+        if (item.type === 'activity') {
+            row.style.backgroundColor = '#f8f9fa';
+            row.style.fontWeight = '600';
+            row.style.cursor = 'pointer';
+            
+            // Click to expand/collapse AND auto-focus
+            row.addEventListener('click', (e) => {
+                e.stopPropagation();
+                toggleExpand(item.actv_code_id);
+                focusOnActivity(item, index);
+            });
+        } else {
+            row.style.backgroundColor = item.isCritical ? '#fef2f2' : '#ffffff';
+            row.addEventListener('click', (e) => {
+                e.stopPropagation();
+                console.log('📝 Task selected:', item.Activity_name);
+                focusOnActivity(item, index);
+            });
+        }
+        
+        // Activity/Task Code
+        const codeCell = document.createElement('td');
+        codeCell.style.width = '120px';
+        codeCell.style.fontSize = item.type === 'activity' ? '13px' : '12px';
+        codeCell.textContent = item.Activity_code || '-';
+        row.appendChild(codeCell);
+        
+        // Name with proper indentation and icons
+        const nameCell = document.createElement('td');
+        nameCell.style.width = '300px';
+        nameCell.style.fontSize = item.type === 'activity' ? '13px' : '12px';
+        
+        const baseIndent = item.type === 'activity' ? CONFIG.INDENT.ACTIVITY : CONFIG.INDENT.TASK;
+        const levelIndent = ((item.level || 1) - 1) * 16;
+        nameCell.style.paddingLeft = `${baseIndent + levelIndent}px`;
+        
+        // Add expand/collapse triangle for activities
+        if (item.type === 'activity') {
+            const triangle = document.createElement('span');
+            triangle.className = 'expand-triangle';
+            triangle.style.cssText = `
+                display: inline-block;
+                width: 0;
+                height: 0;
+                margin-right: 8px;
+                cursor: pointer;
+                border-style: solid;
+            `;
+            
+            if (item.isExpanded) {
+                triangle.style.borderLeft = '6px solid transparent';
+                triangle.style.borderRight = '6px solid transparent';
+                triangle.style.borderTop = '8px solid #6b7280';
+                triangle.style.borderBottom = 'none';
+            } else {
+                triangle.style.borderTop = '6px solid transparent';
+                triangle.style.borderBottom = '6px solid transparent';
+                triangle.style.borderLeft = '8px solid #6b7280';
+                triangle.style.borderRight = 'none';
+            }
+            
+            nameCell.appendChild(triangle);
+            
+            // Add task count for activities
+            const taskCount = document.createElement('span');
+            taskCount.style.cssText = `
+                color: #6b7280;
+                font-size: 11px;
+                margin-left: 8px;
+            `;
+            taskCount.textContent = `(${item.taskCount} tasks)`;
+        }
+        
+        nameCell.appendChild(document.createTextNode(item.Activity_name || '-'));
+        
+        // Add task count for activities
+        if (item.type === 'activity') {
+            const taskCount = document.createElement('span');
+            taskCount.style.cssText = `
+                color: #6b7280;
+                font-size: 11px;
+                margin-left: 8px;
+            `;
+            const directTasksText = item.directTaskCount > 0 ? `${item.directTaskCount} direct` : '';
+            const descendantTasksText = item.taskCount > item.directTaskCount ? `${item.taskCount - item.directTaskCount} descendant` : '';
+            
+            let taskCountText = '';
+            if (directTasksText && descendantTasksText) {
+                taskCountText = `(${directTasksText}, ${descendantTasksText})`;
+            } else if (directTasksText) {
+                taskCountText = `(${directTasksText} tasks)`;
+            } else if (descendantTasksText) {
+                taskCountText = `(${descendantTasksText} tasks)`;
+            } else {
+                taskCountText = '(0 tasks)';
+            }
+            
+            taskCount.textContent = taskCountText;
+            nameCell.appendChild(taskCount);
+        }
+        
+        row.appendChild(nameCell);
+        
+        // Level
+        const levelCell = document.createElement('td');
+        levelCell.style.width = '60px';
+        levelCell.textContent = item.level || '-';
+        row.appendChild(levelCell);
+        
+        // Progress with actual data
+        const progressCell = document.createElement('td');
+        progressCell.style.width = '80px';
+        const progress = item.progress || 0;
+        progressCell.innerHTML = `
+            <div style="display: flex; align-items: center;">
+                <div style="width: 40px; height: 8px; background: #e5e7eb; border-radius: 4px; margin-right: 8px;">
+                    <div style="width: ${progress}%; height: 100%; background: ${progress > 0 ? CONFIG.COLORS.COMPLETE : '#e5e7eb'}; border-radius: 4px;"></div>
+                </div>
+                <span style="font-size: 11px;">${progress}%</span>
+            </div>
+        `;
+        row.appendChild(progressCell);
+        
+        // Duration
+        const durationCell = document.createElement('td');
+        durationCell.style.width = '80px';
+        if (item.type === 'task' && item.duration_days) {
+            durationCell.textContent = `${item.duration_days}d`;
+        } else {
+            durationCell.textContent = '-';
+        }
+        row.appendChild(durationCell);
+        
+        // Type with critical path indicator
+        const typeCell = document.createElement('td');
+        typeCell.style.width = '100px';
+        typeCell.style.fontSize = '11px';
+        
+        let typeText = item.type === 'activity' ? 'Activity' : 'Task';
+        if (item.isCritical) {
+            typeText += ' 🔴';
+        }
+        if (item.type === 'activity' && item.hasCriticalPath) {
+            typeText += ' ⚡';
+        }
+        
+        typeCell.textContent = typeText;
+        row.appendChild(typeCell);
+        
+        tableBody.appendChild(row);
+    });
+    
+    console.log('✅ Enhanced table rendered with', hierarchicalData.length, 'rows');
+    updateCountDisplay();
+}
+
+// Auto-focus on selected activity/task
+function focusOnActivity(item, rowIndex) {
+    const ganttContent = document.getElementById('ganttContent');
+    const ganttHeader = document.getElementById('ganttHeader');
+    
+    if (!ganttContent || !ganttHeader) return;
+    
+    console.log('🎯 Focusing on:', item.Activity_name, 'at row', rowIndex);
+    
+    // Calculate vertical scroll position
+    const rowHeight = CONFIG.ROW_HEIGHT;
+    const verticalScrollTop = rowIndex * rowHeight;
+    
+    // Calculate horizontal scroll position if item has dates
+    let horizontalScrollLeft = 0;
+    if ((item.type === 'activity' && item.calculated_start_date) || 
+        (item.type === 'task' && (item.target_start_date || item.act_start_date || item.early_start_date))) {
+        
+        const startDate = item.type === 'activity' ? 
+            item.calculated_start_date : 
+            new Date(item.target_start_date || item.act_start_date || item.early_start_date);
+            
+        if (startDate && timelineRange.start) {
+            const daysFromStart = Math.floor((startDate - timelineRange.start) / (1000 * 60 * 60 * 24));
+            const containerWidth = ganttContent.clientWidth;
+            const totalDays = Math.ceil((timelineRange.end - timelineRange.start) / (1000 * 60 * 60 * 24));
+            const dayWidth = Math.min(50, Math.max(25, Math.floor(containerWidth * 0.95 / totalDays)));
+            const barLeft = daysFromStart * dayWidth;
+            
+            // Center the bar in viewport
+            horizontalScrollLeft = Math.max(0, barLeft - containerWidth / 2);
+        }
+    }
+    
+    // Smooth scroll to position
+    ganttContent.scrollTo({
+        left: horizontalScrollLeft,
+        top: verticalScrollTop,
+        behavior: 'smooth'
+    });
+    
+    // Highlight the selected row and bar
+    highlightSelectedRow(rowIndex);
+}
+
+// Add visual feedback for selected activity/task
+function highlightSelectedRow(rowIndex) {
+    // Remove existing highlights
+    document.querySelectorAll('.selected-row').forEach(row => {
+        row.classList.remove('selected-row');
+    });
+    document.querySelectorAll('.selected-bar').forEach(bar => {
+        bar.classList.remove('selected-bar');
+    });
+    
+    // Highlight selected table row
+    const tableRows = document.querySelectorAll('#tableBody tr');
+    if (tableRows[rowIndex]) {
+        tableRows[rowIndex].classList.add('selected-row');
+        console.log('✨ Highlighted table row', rowIndex);
+    }
+    
+    // Highlight corresponding Gantt bar
+    const ganttBars = document.querySelectorAll('.gantt-bar');
+    if (ganttBars[rowIndex]) {
+        ganttBars[rowIndex].classList.add('selected-bar');
+        console.log('✨ Highlighted Gantt bar', rowIndex);
+    }
+    
+    // Remove highlight after 3 seconds
+    setTimeout(() => {
+        if (tableRows[rowIndex]) {
+            tableRows[rowIndex].classList.remove('selected-row');
+        }
+        if (ganttBars[rowIndex]) {
+            ganttBars[rowIndex].classList.remove('selected-bar');
+        }
+        console.log('🔄 Removed highlights for row', rowIndex);
+    }, 3000);
+}
+
+// FIXED: Render Gantt header with proper date synchronization
+function renderGanttHeader() {
+    const ganttHeader = document.getElementById('ganttHeader');
+    const ganttContent = document.getElementById('ganttContent');
+    if (!ganttHeader || !ganttContent || !timelineRange.start || !timelineRange.end) {
+        console.warn('⚠️ Cannot render Gantt header - missing elements or timeline range');
+        return;
+    }
+    
+    console.log('📅 Rendering synchronized Gantt header...');
+    ganttHeader.innerHTML = '';
+    
+    const totalDays = Math.ceil((timelineRange.end - timelineRange.start) / (1000 * 60 * 60 * 24));
+    
+    // FIXED: Use same day width calculation as Gantt content
+    const containerWidth = ganttContent.clientWidth;
+    const minDayWidth = 25;
+    const maxDayWidth = 50;
+    
+    let dayWidth;
+    if (containerWidth && totalDays > 0) {
+        dayWidth = Math.min(maxDayWidth, Math.max(minDayWidth, Math.floor(containerWidth * 0.95 / totalDays)));
+    } else {
+        dayWidth = CONFIG.MIN_DAY_WIDTH;
+    }
+    
+    const timelineWidth = totalDays * dayWidth;
+    
+    // Create container for timeline
+    const timelineContainer = document.createElement('div');
+    timelineContainer.style.width = `${timelineWidth}px`;
+    timelineContainer.style.height = '80px';
+    timelineContainer.style.position = 'relative';
+    
+    // Month row
+    const monthRow = document.createElement('div');
+    monthRow.className = 'timeline-header-row month-header';
+    monthRow.style.position = 'absolute';
+    monthRow.style.top = '0';
+    monthRow.style.width = '100%';
+    
+    // Week row  
+    const weekRow = document.createElement('div');
+    weekRow.className = 'timeline-header-row week-header';
+    weekRow.style.position = 'absolute';
+    weekRow.style.top = '40px';
+    weekRow.style.width = '100%';
+    
+    // Generate month headers
+    let currentDate = new Date(timelineRange.start);
+    let currentMonth = -1;
+    let monthStart = 0;
+    
+    for (let day = 0; day < totalDays; day++) {
+        // Month headers
+        if (currentDate.getMonth() !== currentMonth) {
+            if (currentMonth !== -1) {
+                // Close previous month
+                const monthCell = monthRow.children[monthRow.children.length - 1];
+                if (monthCell) {
+                    const monthWidth = ((day - monthStart) * dayWidth);
+                    monthCell.style.width = `${monthWidth}px`;
+                }
+            }
+            
+            currentMonth = currentDate.getMonth();
+            monthStart = day;
+            
+            const monthCell = document.createElement('div');
+            monthCell.className = 'timeline-header-cell';
+            monthCell.style.position = 'absolute';
+            monthCell.style.left = `${day * dayWidth}px`;
+            monthCell.style.height = '40px';
+            monthCell.textContent = currentDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+            monthRow.appendChild(monthCell);
+        }
+        
+        // Week headers (every 7 days)
+        if (day % 7 === 0 || day === 0) {
+            const weekCell = document.createElement('div');
+            weekCell.className = 'timeline-header-cell';
+            weekCell.style.position = 'absolute';
+            weekCell.style.left = `${day * dayWidth}px`;
+            weekCell.style.width = `${Math.min(7, totalDays - day) * dayWidth}px`;
+            weekCell.style.height = '40px';
+            weekCell.textContent = currentDate.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
+            weekRow.appendChild(weekCell);
+        }
+        
+        currentDate.setDate(currentDate.getDate() + 1);
+    }
+    
+    // Close last month
+    if (monthRow.children.length > 0) {
+        const monthCell = monthRow.children[monthRow.children.length - 1];
+        const monthWidth = ((totalDays - monthStart) * dayWidth);
+        monthCell.style.width = `${monthWidth}px`;
+    }
+    
+    timelineContainer.appendChild(monthRow);
+    timelineContainer.appendChild(weekRow);
+    ganttHeader.appendChild(timelineContainer);
+    
+    console.log('✅ Gantt header rendered');
+}
+
+// Enhanced Gantt chart rendering with hierarchy and today line
+function renderGantt() {
+    const ganttContent = document.getElementById('ganttContent');
+    if (!ganttContent || !timelineRange.start || !timelineRange.end) return;
+    
+    console.log('📊 Rendering enhanced Gantt chart...');
+    ganttContent.innerHTML = '';
+    
+    if (hierarchicalData.length === 0) {
+        ganttContent.innerHTML = '<div style="padding: 20px; text-align: center; color: #6b7280;">No activities with tasks to display</div>';
+        return;
+    }
+    
+    const totalDays = Math.ceil((timelineRange.end - timelineRange.start) / (1000 * 60 * 60 * 24));
+    
+    // FIXED: Calculate optimal day width with minimum visibility requirements
+    const containerWidth = ganttContent.clientWidth;
+    const minDayWidth = 25; // Minimum 25px per day for visibility
+    const maxDayWidth = 50; // Maximum to prevent excessive width
+    
+    let optimalDayWidth;
+    if (containerWidth && totalDays > 0) {
+        optimalDayWidth = Math.min(maxDayWidth, Math.max(minDayWidth, Math.floor(containerWidth * 0.95 / totalDays)));
+    } else {
+        optimalDayWidth = CONFIG.MIN_DAY_WIDTH;
+    }
+    
+    const timelineWidth = totalDays * optimalDayWidth;
+    const totalHeight = hierarchicalData.length * CONFIG.ROW_HEIGHT;
+    
+    // Create container for all elements
+    const chartContainer = document.createElement('div');
+    chartContainer.style.cssText = `
+        position: relative;
+        width: ${timelineWidth}px;
+        height: ${totalHeight}px;
+        background: linear-gradient(90deg, transparent ${optimalDayWidth - 1}px, #f0f0f0 ${optimalDayWidth - 1}px, #f0f0f0 ${optimalDayWidth}px, transparent ${optimalDayWidth}px);
+        background-size: ${optimalDayWidth}px 100%;
+    `;
+    
+    // Add today line
+    const today = new Date();
+    if (today >= timelineRange.start && today <= timelineRange.end) {
+        const todayPosition = Math.floor((today - timelineRange.start) / (1000 * 60 * 60 * 24)) * optimalDayWidth;
+        const todayLine = document.createElement('div');
+        todayLine.style.cssText = `
+            position: absolute;
+            left: ${todayPosition}px;
+            top: 0;
+            width: 2px;
+            height: 100%;
+            background: ${CONFIG.COLORS.TODAY_LINE};
+            z-index: 100;
+        `;
+        chartContainer.appendChild(todayLine);
+        
+        // Today label
+        const todayLabel = document.createElement('div');
+        todayLabel.style.cssText = `
+            position: absolute;
+            left: ${todayPosition + 5}px;
+            top: 5px;
+            font-size: 11px;
+            font-weight: bold;
+            color: ${CONFIG.COLORS.TODAY_LINE};
+            background: white;
+            padding: 2px 4px;
+            border-radius: 3px;
+            z-index: 101;
+        `;
+        todayLabel.textContent = 'TODAY';
+        chartContainer.appendChild(todayLabel);
+    }
+    
+    console.log('📏 Enhanced Gantt dimensions:', { 
+        totalDays, 
+        optimalDayWidth, 
+        timelineWidth, 
+        itemCount: hierarchicalData.length,
+        timelineStart: timelineRange.start.toISOString().split('T')[0],
+        timelineEnd: timelineRange.end.toISOString().split('T')[0],
+        containerWidth
+    });
+    
+    let barsCreated = 0;
+    hierarchicalData.forEach((item, index) => {
+        const bar = createEnhancedGanttBar(item, index, totalDays, optimalDayWidth);
+        if (bar) {
+            chartContainer.appendChild(bar);
+            barsCreated++;
+        }
+    });
+    
+    ganttContent.appendChild(chartContainer);
+    console.log(`✅ Enhanced Gantt rendered with ${barsCreated} bars out of ${hierarchicalData.length} items`);
+}
+
+// FIXED: Create enhanced Gantt bars with proper date-based positioning
+function createEnhancedGanttBar(item, index, totalDays, dayWidth) {
+    // Determine dates based on item type
+    let startDate, endDate;
+    
+    if (item.type === 'activity') {
+        startDate = item.calculated_start_date;
+        endDate = item.calculated_end_date;
+    } else {
+        // For tasks, get the best available dates
+        const taskStart = item.target_start_date || item.act_start_date || item.early_start_date;
+        const taskEnd = item.target_end_date || item.act_end_date || item.early_end_date;
+        startDate = taskStart ? new Date(taskStart) : null;
+        endDate = taskEnd ? new Date(taskEnd) : null;
+    }
+    
+    if (!startDate || !endDate || isNaN(startDate) || isNaN(endDate)) {
+        console.warn('⚠️ Invalid dates for item:', item.Activity_code, { 
+            type: item.type,
+            startDate: startDate?.toISOString?.() || 'invalid',
+            endDate: endDate?.toISOString?.() || 'invalid'
+        });
+        return null;
+    }
+    
+    // FIXED: Calculate exact position and duration from actual dates
+    const daysFromStart = Math.floor((startDate - timelineRange.start) / (1000 * 60 * 60 * 24));
+    const duration = Math.max(1, Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)));
+    
+    // Calculate pixel positions
+    const left = daysFromStart * dayWidth;
+    const width = Math.max(10, duration * dayWidth); // Minimum 10px width
+    
+    // Debug logging for bar positioning
+    console.log(`📊 Bar positioning for ${item.Activity_code}:`, {
+        type: item.type,
+        startDate: startDate.toISOString().split('T')[0],
+        endDate: endDate.toISOString().split('T')[0],
+        daysFromStart,
+        duration,
+        left: `${left}px`,
+        width: `${width}px`,
+        dayWidth
+    });
+    
+    // Skip if completely outside visible range
+    if (daysFromStart < -duration || daysFromStart > totalDays + duration) {
+        return null;
+    }
+    
+    // FIXED: Create bar container with calculated positions
+    const barContainer = document.createElement('div');
+    barContainer.style.cssText = `
+        position: absolute;
+        left: ${left}px;
+        top: ${index * CONFIG.ROW_HEIGHT + CONFIG.BAR_MARGIN}px;
+        width: ${width}px;
+        height: ${CONFIG.BAR_HEIGHT}px;
+    `;
+    
+    // Determine bar color and style
+    let barColor, borderColor;
+    if (item.type === 'activity') {
+        barColor = item.hasCriticalPath ? CONFIG.COLORS.CRITICAL : CONFIG.COLORS.ACTIVITY;
+        borderColor = 'rgba(0,0,0,0.2)';
+    } else {
+        barColor = item.isCritical ? CONFIG.COLORS.CRITICAL : CONFIG.COLORS.TASK;
+        borderColor = 'rgba(0,0,0,0.15)';
+    }
+    
+    // Create main bar
+    const mainBar = document.createElement('div');
+    mainBar.style.cssText = `
+        position: relative;
+        width: 100%;
+        height: 100%;
+        background: ${barColor};
+        border: 1px solid ${borderColor};
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    `;
+    
+    // Add progress overlay
+    if (item.progress && item.progress > 0) {
+        const progressBar = document.createElement('div');
+        progressBar.style.cssText = `
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: ${item.progress}%;
+            height: 100%;
+            background: ${CONFIG.COLORS.PROGRESS};
+            border-radius: 3px;
+            z-index: 1;
+        `;
+        mainBar.appendChild(progressBar);
+    }
+    
+    // FIXED: Add label if bar is wide enough (reduced threshold to 60px)
+    if (width > 60) {
+        const label = document.createElement('div');
+        label.style.cssText = `
+            position: absolute;
+            left: 6px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: white;
+            font-size: ${item.type === 'activity' ? '12px' : '11px'};
+            font-weight: ${item.type === 'activity' ? '600' : '500'};
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: ${width - 12}px;
+            text-shadow: 1px 1px 1px rgba(0,0,0,0.5);
+            z-index: 2;
+        `;
+        label.textContent = item.Activity_name || item.Activity_code || 'Unnamed';
+        mainBar.appendChild(label);
+    }
+    
+    // Add duration label for tasks and activities
+    if (width > 40) {
+        const durationLabel = document.createElement('div');
+        durationLabel.style.cssText = `
+            position: absolute;
+            right: 6px;
+            top: 2px;
+            color: white;
+            font-size: 9px;
+            font-weight: 500;
+            text-shadow: 1px 1px 1px rgba(0,0,0,0.5);
+            z-index: 2;
+        `;
+        durationLabel.textContent = `${duration}d`;
+        mainBar.appendChild(durationLabel);
+    }
+    
+    // Add hover effects
+    mainBar.addEventListener('mouseenter', () => {
+        mainBar.style.transform = 'translateY(-1px)';
+        mainBar.style.boxShadow = '0 3px 8px rgba(0,0,0,0.2)';
+        
+        // Show tooltip
+        showTooltip(item, barContainer);
+    });
+    
+    mainBar.addEventListener('mouseleave', () => {
+        mainBar.style.transform = 'translateY(0)';
+        mainBar.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+        
+        // Hide tooltip
+        hideTooltip();
+    });
+    
+    // Add click handler
+    mainBar.addEventListener('click', (e) => {
+        e.stopPropagation();
+        console.log(`📝 ${item.type} clicked:`, {
+            code: item.Activity_code,
+            name: item.Activity_name,
+            start: startDate.toLocaleDateString(),
+            end: endDate.toLocaleDateString(),
+            duration: item.duration_days || duration,
+            progress: item.progress || 0
+        });
+    });
+    
+    barContainer.appendChild(mainBar);
+    return barContainer;
+}
+
+// Show tooltip on hover
+function showTooltip(item, container) {
+    hideTooltip(); // Remove any existing tooltip
+    
+    const tooltip = document.createElement('div');
+    tooltip.id = 'gantt-tooltip';
+    tooltip.style.cssText = `
+        position: absolute;
+        bottom: ${CONFIG.BAR_HEIGHT + 8}px;
+        left: 0;
+        background: rgba(0,0,0,0.9);
+        color: white;
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 12px;
+        white-space: nowrap;
+        z-index: 1000;
+        pointer-events: none;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    `;
+    
+    const startDate = item.type === 'activity' ? item.calculated_start_date : new Date(item.start_date);
+    const endDate = item.type === 'activity' ? item.calculated_end_date : new Date(item.end_date);
+    
+    tooltip.innerHTML = `
+        <div style="font-weight: 600; margin-bottom: 4px;">${item.Activity_name}</div>
+        <div style="font-size: 11px; opacity: 0.9;">
+            ${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}<br>
+            ${item.progress || 0}% complete
+            ${item.duration_days ? ` • ${item.duration_days} days` : ''}
+            ${item.isCritical ? ' • <span style="color: #FCA5A5;">Critical</span>' : ''}
+        </div>
+    `;
+    
+    container.appendChild(tooltip);
+}
+
+// Hide tooltip
+function hideTooltip() {
+    const existing = document.getElementById('gantt-tooltip');
+    if (existing) {
+        existing.remove();
+    }
+}
+
+// Toggle expand/collapse for activities
+function toggleExpand(awpId) {
+    console.log('🔄 Toggling expand for AWP:', awpId);
+    
+    if (expandedNodes.has(awpId)) {
+        expandedNodes.delete(awpId);
+    } else {
+        expandedNodes.add(awpId);
+    }
+    
+    // Rebuild hierarchy and re-render
+    buildEnhancedHierarchy();
+    renderAll();
+}
+
+// Utility functions
+function formatDate(date) {
+    return date.toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric', 
+        year: 'numeric' 
+    });
+}
+
+function showLoading() {
+    const tableBody = document.getElementById('tableBody');
+    if (tableBody) {
+        tableBody.innerHTML = '<tr><td colspan="6" style="padding: 20px; text-align: center;"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>';
+    }
+}
+
+function showError(message) {
+    const tableBody = document.getElementById('tableBody');
+    if (tableBody) {
+        tableBody.innerHTML = `<tr><td colspan="6" style="padding: 20px; text-align: center; color: #dc2626;"><i class="fas fa-exclamation-triangle"></i> ${message}</td></tr>`;
+    }
+}
+
+function clearData() {
+    awpData = [];
+    hierarchicalData = [];
+    selectedAwpId = null;
+    filteredTasks = [];
+    expandedNodes.clear();
+    currentProjectId = null;
+    
+    const tableBody = document.getElementById('tableBody');
+    if (tableBody) {
+        tableBody.innerHTML = '<tr><td colspan="6" style="padding: 20px; text-align: center; color: #6b7280;">Select a project to view AWP data</td></tr>';
+    }
+    
+    const ganttHeader = document.getElementById('ganttHeader');
+    if (ganttHeader) ganttHeader.innerHTML = '';
+    
+    const ganttContent = document.getElementById('ganttContent');
+    if (ganttContent) ganttContent.innerHTML = '';
+    
+    updateCountDisplay();
+}
+
+// Update count display with hierarchy information
+function updateCountDisplay() {
+    const activities = hierarchicalData.filter(item => item.type === 'activity').length;
+    const tasks = hierarchicalData.filter(item => item.type === 'task').length;
+    const activitiesWithTasks = hierarchicalData.filter(item => item.type === 'activity' && item.hasDescendantTasks).length;
+    const activitiesWithoutTasks = hierarchicalData.filter(item => item.type === 'activity' && !item.hasDescendantTasks).length;
+    const visibleCount = hierarchicalData.length;
+    
+    const visibleElement = document.getElementById('visibleCount');
+    const totalElement = document.getElementById('totalCount');
+    
+    if (visibleElement) visibleElement.textContent = visibleCount;
+    if (totalElement) totalElement.textContent = `${activities} activities`;
+    
+    // Update status to show hierarchy information
+    const statusElement = document.querySelector('.text-sm.text-gray-600');
+    if (statusElement) {
+        if (activities > 0) {
+            statusElement.textContent = `AWP Hierarchy: ${activities} total activities (${activitiesWithTasks} with tasks, ${activitiesWithoutTasks} parent-only), ${tasks} tasks shown`;
+        } else {
+            statusElement.textContent = 'AWP Hierarchy - Select a project to view data';
+        }
+    }
+}
