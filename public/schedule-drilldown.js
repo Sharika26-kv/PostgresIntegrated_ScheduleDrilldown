@@ -234,9 +234,9 @@ function getHistoryEndpoint(metric) {
     const endpoints = {
         'leads': '/api/schedule/leads-percentage-history',
         'lags': '/api/schedule/lags-percentage-history',
-        'excessive-lags': '/api/schedule/excessive-lags-line-chart',
-        'fs': '/api/schedule/fs-line-chart',
-        'non-fs': '/api/schedule/non-fs-line-chart'
+        'excessive-lags': '/api/schedule/excessive-lags-percentage-history',
+        'fs': '/api/schedule/fs-percentage-history',
+        'non-fs': '/api/schedule/non-fs-percentage-history'
     };
     
     return endpoints[metric] || endpoints['leads'];
@@ -379,8 +379,8 @@ function createChart(ctx, data, metric) {
     
     // Process data based on metric type
     if (Array.isArray(data) && data.length > 0) {
-        config.data.labels = data.map(item => item.label || item.name || 'Unknown');
-        config.data.datasets[0].data = data.map(item => item.value || item.count || 0);
+        config.data.labels = data.map(item => item.details || 'Unknown');
+        config.data.datasets[0].data = data.map(item => item.value || 0);
     } else if (data && typeof data === 'object') {
         // Handle object-based data
         const entries = Object.entries(data);

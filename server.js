@@ -1918,7 +1918,11 @@ app.get('/api/schedule/fs-chart-data', async (req, res) => {
     try {
         const projectId = req.query.project_id;
         
-        let filters = ["relationship_status = 'Incomplete'", "relationship_type = 'PR_FS'", "lag = '0'"];
+        let filters = [
+            "relationship_status = 'Incomplete'",
+            "(relationship_type = 'PR_FS' OR relationship_type = 'PR_FS1')",
+            "lag = '0'"
+        ];
         const params = [];
         
         if (projectId && projectId !== 'all') {
@@ -1930,8 +1934,8 @@ app.get('/api/schedule/fs-chart-data', async (req, res) => {
         
         const query = `
             SELECT 
-                relationship_type as relationship_type,
-                COUNT(*) as count
+                relationship_type as details,
+                COUNT(*) as value
             FROM activity_relationship_view 
             ${whereClause}
             GROUP BY relationship_type
@@ -1953,7 +1957,11 @@ app.get('/api/schedule/non-fs-chart-data', async (req, res) => {
     try {
         const projectId = req.query.project_id;
         
-        let filters = ["relationship_status = 'Incomplete'", "(relationship_type != 'PR_FS' OR lag != '0')"];
+        let filters = [
+            "relationship_status = 'Incomplete'",
+            "relationship_type NOT IN ('PR_FS', 'PR_FS1')",
+            "lag = '0'"
+        ];
         const params = [];
         
         if (projectId && projectId !== 'all') {
@@ -1965,8 +1973,8 @@ app.get('/api/schedule/non-fs-chart-data', async (req, res) => {
         
         const query = `
             SELECT 
-                relationship_type as relationship_type,
-                COUNT(*) as count
+                relationship_type as details,
+                COUNT(*) as value
             FROM activity_relationship_view 
             ${whereClause}
             GROUP BY relationship_type
@@ -2238,33 +2246,28 @@ app.get('/api/schedule/excessive-lags-percentage-history', async (req, res) => {
     try {
         const projectId = req.query.project_id;
         
-        let filters = ["f.relationship_percentage IS NOT NULL", "a.excessive_lag > '0'"];
-        const params = [];
+        // Calculate excessive lags percentage history directly from activity_relationship_view
+        let query = `
+            SELECT
+                TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM') as date,
+                COUNT(CASE WHEN a.lag > '0' THEN 1 END) * 100.0 / 
+                NULLIF(COUNT(*), 0) as percentage
+            FROM activity_relationship_view a
+            INNER JOIN project p ON a.project_id = p.proj_id
+            WHERE a.relationship_status = 'Incomplete'
+        `;
         
+        const params = [];
         if (projectId && projectId !== 'all') {
-            filters.push('f.project_id = $1');
+            query += ` AND a.project_id = $1`;
             params.push(projectId);
         }
         
-        const whereClause = filters.length > 0 ? 'WHERE ' + filters.join(' AND ') : '';
-        
-        // Fix the JOIN by casting project_id to match data types
-        const query = `
-            SELECT
-                TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM') as date,
-                AVG(f.relationship_percentage) as percentage
-            FROM final_activity_kpi_view f
-            INNER JOIN project p ON CAST(f.project_id AS VARCHAR) = p.proj_id
-            INNER JOIN activity_relationship_view a ON CAST(f.project_id AS VARCHAR) = a.project_id
-            ${whereClause}
-            GROUP BY TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM')
-            ORDER BY date
-        `;
+        query += ` GROUP BY TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM') ORDER BY date`;
 
         const result = await db.query(query, params);
-        const rows = result.rows;
 
-        const transformedData = rows.map(row => ({
+        const transformedData = result.rows.map(row => ({
             date: row.date,
             percentage: Math.round(row.percentage * 100) / 100
         }));
