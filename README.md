@@ -1,6 +1,6 @@
-# BIM_XER_Masher
+# Nirman PostgreSQL Integrated Schedule Drilldown
 
-A web application for integrating BIM (Building Information Modeling) IFC files with project schedule XER files.
+A comprehensive project management and schedule analytics application built with Node.js, PostgreSQL, and modern web technologies. This application provides detailed schedule metrics, analytics, and interactive visualizations for construction project management.
 
 ## Overview
 
