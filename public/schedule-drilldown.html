@@ -14,6 +14,12 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        .table-cell-compact {
+            font-size: 10px !important;
+            line-height: 1.2 !important;
+        }
+    </style>
 </head>
 <body class="bg-gray-100 font-sans leading-normal tracking-normal schedule-drilldown-compact">
     <!-- Sidebar Toggle Button -->
@@ -101,13 +107,13 @@
                     <div class="flex items-center">
                         <!-- Export Buttons -->
                         <div class="flex items-center space-x-2 mr-6">
-                            <button id="exportPdf" class="border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm hover:bg-gray-50 transition-colors duration-200">
+                            <button id="exportPdf" class="border border-gray-300 text-gray-700 px-2 py-1 rounded text-xs hover:bg-gray-50 transition-colors duration-200">
                                 <i class="fas fa-file-pdf mr-1"></i> PDF
                             </button>
-                            <button id="exportExcel" class="border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm hover:bg-gray-50 transition-colors duration-200">
+                            <button id="exportExcel" class="border border-gray-300 text-gray-700 px-2 py-1 rounded text-xs hover:bg-gray-50 transition-colors duration-200">
                                 <i class="fas fa-file-excel mr-1"></i> Excel
                             </button>
-                            <button id="exportImage" class="border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm hover:bg-gray-50 transition-colors duration-200">
+                            <button id="exportImage" class="border border-gray-300 text-gray-700 px-2 py-1 rounded text-xs hover:bg-gray-50 transition-colors duration-200">
                                 <i class="fas fa-image mr-1"></i> Image
                             </button>
                         </div>
@@ -129,10 +135,10 @@
                     <div class="flex items-center justify-between">
                         <div class="flex items-center">
                             <label for="projectFilter" class="text-sm font-medium text-gray-700 mr-2">Project:</label>
-                            <select id="projectFilter" class="px-4 py-2 border border-gray-300 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            <select id="projectFilter" class="px-2 py-1 border border-gray-300 rounded text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                                 <option value="">All Projects</option>
                             </select>
-                            <button id="refreshProjectBtn" class="ml-2 bg-blue-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-blue-700">
+                            <button id="refreshProjectBtn" class="ml-2 bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700">
                                 <i class="fas fa-sync-alt mr-1"></i> Load
                             </button>
                         </div>
@@ -141,65 +147,82 @@
             </header>
             
             <!-- Dashboard Content -->
-            <main class="p-4">
-                <!-- Metric Selection Cards -->
-                <div class="grid grid-cols-1 md:grid-cols-5 gap-3 mb-4">
-                    <div class="metric-card bg-white rounded-lg shadow-lg p-4 cursor-pointer border-2 border-transparent hover:border-purple-500 transition-all duration-200" data-metric="fs">
+            <main class="p-2">
+                                  <!-- Metric Selection Cards -->
+                  <div class="grid grid-cols-1 md:grid-cols-7 gap-2 mb-2">
+                                            <div class="metric-card bg-white rounded-lg shadow-lg p-2 cursor-pointer border-2 border-transparent hover:border-purple-500 transition-all duration-200" data-metric="fs">
                         <div class="flex items-center justify-between">
                             <div>
-                                <h3 class="text-md font-semibold text-gray-800">FS+0d</h3>
-                                <p class="text-xs text-gray-600">Finish-to-Start</p>
+                                <h3 class="text-xs font-medium text-gray-800">Typical Relationships FS+0d Lag</h3>
                             </div>
-                            <div class="bg-purple-100 p-2 rounded-full">
-                                <i class="fas fa-link text-purple-600 text-lg"></i>
+                            <div class="bg-purple-100 p-1 rounded-full">
+                                <i class="fas fa-link text-purple-600 text-sm"></i>
                             </div>
                         </div>
                     </div>
                     
-                    <div class="metric-card bg-white rounded-lg shadow-lg p-4 cursor-pointer border-2 border-transparent hover:border-red-500 transition-all duration-200" data-metric="non-fs">
+                                            <div class="metric-card bg-white rounded-lg shadow-lg p-2 cursor-pointer border-2 border-transparent hover:border-red-500 transition-all duration-200" data-metric="non-fs">
                         <div class="flex items-center justify-between">
                             <div>
-                                <h3 class="text-md font-semibold text-gray-800">Non FS+0d</h3>
-                                <p class="text-xs text-gray-600">Other relationships</p>
+                                <h3 class="text-xs font-medium text-gray-800">Typical Relationships Non FS+0d Lag</h3>
                             </div>
-                            <div class="bg-red-100 p-2 rounded-full">
-                                <i class="fas fa-random text-red-600 text-lg"></i>
+                            <div class="bg-red-100 p-1 rounded-full">
+                                <i class="fas fa-random text-red-600 text-sm"></i>
                             </div>
                         </div>
                     </div>
                     
-                    <div class="metric-card bg-white rounded-lg shadow-lg p-4 cursor-pointer border-2 border-transparent hover:border-blue-500 transition-all duration-200" data-metric="leads">
+                                            <div class="metric-card bg-white rounded-lg shadow-lg p-2 cursor-pointer border-2 border-transparent hover:border-blue-500 transition-all duration-200" data-metric="leads">
                         <div class="flex items-center justify-between">
                             <div>
-                                <h3 class="text-md font-semibold text-gray-800">Leads</h3>
-                                <p class="text-xs text-gray-600">Activity relationships</p>
+                                <h3 class="text-xs font-medium text-gray-800">Leads</h3>
                             </div>
-                            <div class="bg-blue-100 p-2 rounded-full">
-                                <i class="fas fa-arrow-right text-blue-600 text-lg"></i>
+                            <div class="bg-blue-100 p-1 rounded-full">
+                                <i class="fas fa-arrow-right text-blue-600 text-sm"></i>
                             </div>
                         </div>
                     </div>
                     
-                    <div class="metric-card bg-white rounded-lg shadow-lg p-4 cursor-pointer border-2 border-transparent hover:border-green-500 transition-all duration-200" data-metric="lags">
+                                            <div class="metric-card bg-white rounded-lg shadow-lg p-2 cursor-pointer border-2 border-transparent hover:border-green-500 transition-all duration-200" data-metric="lags">
                         <div class="flex items-center justify-between">
                             <div>
-                                <h3 class="text-md font-semibold text-gray-800">Lags</h3>
-                                <p class="text-xs text-gray-600">Schedule delays</p>
+                                <h3 class="text-xs font-medium text-gray-800">Lags</h3>
                             </div>
-                            <div class="bg-green-100 p-2 rounded-full">
-                                <i class="fas fa-clock text-green-600 text-lg"></i>
+                            <div class="bg-green-100 p-1 rounded-full">
+                                <i class="fas fa-clock text-green-600 text-sm"></i>
                             </div>
                         </div>
                     </div>
                     
-                    <div class="metric-card bg-white rounded-lg shadow-lg p-4 cursor-pointer border-2 border-transparent hover:border-orange-500 transition-all duration-200" data-metric="excessive-lags">
+                                            <div class="metric-card bg-white rounded-lg shadow-lg p-2 cursor-pointer border-2 border-transparent hover:border-orange-500 transition-all duration-200" data-metric="excessive-lags">
                         <div class="flex items-center justify-between">
                             <div>
-                                <h3 class="text-md font-semibold text-gray-800">Excessive Lags</h3>
-                                <p class="text-xs text-gray-600">Critical delays</p>
+                                <h3 class="text-xs font-medium text-gray-800">Excessive Lags</h3>
                             </div>
-                            <div class="bg-orange-100 p-2 rounded-full">
-                                <i class="fas fa-exclamation-triangle text-orange-600 text-lg"></i>
+                            <div class="bg-orange-100 p-1 rounded-full">
+                                <i class="fas fa-exclamation-triangle text-orange-600 text-sm"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                                            <div class="metric-card bg-white rounded-lg shadow-lg p-2 cursor-pointer border-2 border-transparent hover:border-teal-500 transition-all duration-200" data-metric="open-ends">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h3 class="text-xs font-medium text-gray-800">Open Ends</h3>
+                            </div>
+                            <div class="bg-teal-100 p-1 rounded-full">
+                                <i class="fas fa-unlink text-teal-600 text-sm"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                                            <div class="metric-card bg-white rounded-lg shadow-lg p-2 cursor-pointer border-2 border-transparent hover:border-indigo-500 transition-all duration-200" data-metric="constraints">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h3 class="text-xs font-medium text-gray-800">Constraints</h3>
+                            </div>
+                            <div class="bg-indigo-100 p-1 rounded-full">
+                                <i class="fas fa-lock text-indigo-600 text-sm"></i>
                             </div>
                         </div>
                     </div>
@@ -208,26 +231,26 @@
                 <!-- Dynamic Content Area -->
                 <div id="metric-content" class="hidden">
                     <!-- KPI Cards will be dynamically inserted here -->
-                    <div id="kpi-section" class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4"></div>
+                    <div id="kpi-section" class="grid grid-cols-1 md:grid-cols-3 gap-2 mb-2 justify-center"></div>
                     
                     <!-- Charts and Tables Section -->
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-2 mb-2">
                         <!-- Chart Section -->
-                        <div id="chart-section" class="bg-white rounded-lg shadow-lg p-4">
-                            <div class="mb-3">
-                                <h3 class="text-md font-semibold text-gray-800">Distribution Chart</h3>
+                        <div id="chart-section" class="bg-white rounded-lg shadow-lg p-2">
+                            <div class="mb-1">
+                                <h3 class="text-xs font-medium text-gray-800">Distribution Chart</h3>
                             </div>
-                            <div class="chart-container" style="height: 250px; position: relative;">
+                            <div class="chart-container" style="height: 220px; position: relative;">
                                 <canvas id="metric-chart"></canvas>
                             </div>
                         </div>
                         
                         <!-- History Chart Section -->
-                        <div id="history-section" class="bg-white rounded-lg shadow-lg p-4">
-                            <div class="mb-3">
-                                <h3 class="text-md font-semibold text-gray-800">History Trend</h3>
+                        <div id="history-section" class="bg-white rounded-lg shadow-lg p-2">
+                            <div class="mb-1">
+                                <h3 class="text-xs font-medium text-gray-800">History Trend</h3>
                             </div>
-                            <div class="chart-container" style="height: 250px; position: relative;">
+                            <div class="chart-container" style="height: 220px; position: relative;">
                                 <canvas id="history-chart"></canvas>
                             </div>
                         </div>
@@ -235,8 +258,8 @@
                     
                     <!-- Data Table Section -->
                     <div id="table-section" class="bg-white rounded-lg shadow-lg">
-                        <div class="border-b border-gray-200 px-4 py-3">
-                            <h3 class="text-md font-semibold text-gray-800">Detailed Data</h3>
+                        <div class="border-b border-gray-200 px-2 py-1">
+                            <h3 class="text-xs font-medium text-gray-800">Detailed Data</h3>
                         </div>
                         <div class="overflow-x-auto">
                             <table class="min-w-full" id="metric-table">

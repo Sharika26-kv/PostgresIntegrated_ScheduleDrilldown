@@ -114,7 +114,7 @@ async function loadProjects() {
 function selectMetric(metric) {
     // Update UI state
     document.querySelectorAll('.metric-card').forEach(card => {
-        card.classList.remove('border-blue-500', 'border-green-500', 'border-orange-500', 'border-purple-500', 'border-red-500');
+        card.classList.remove('border-blue-500', 'border-green-500', 'border-orange-500', 'border-purple-500', 'border-red-500', 'border-teal-500');
         card.classList.add('border-transparent');
     });
     
@@ -125,7 +125,9 @@ function selectMetric(metric) {
             'lags': 'border-green-500',
             'excessive-lags': 'border-orange-500',
             'fs': 'border-purple-500',
-            'non-fs': 'border-red-500'
+            'non-fs': 'border-red-500',
+            'open-ends': 'border-teal-500',
+            'constraints': 'border-indigo-500'
         };
         selectedCard.classList.add(colorMap[metric]);
     }
@@ -214,7 +216,9 @@ function getKPIEndpoint(metric) {
         'lags': '/api/schedule/lags-kpi',
         'excessive-lags': '/api/schedule/excessive-lags-kpi',
         'fs': '/api/schedule/fs-kpi',
-        'non-fs': '/api/schedule/non-fs-kpi'
+        'non-fs': '/api/schedule/non-fs-kpi',
+        'open-ends': '/api/schedule/open-ends-kpi',
+        'constraints': '/api/schedule/constraints-kpi'
     };
     return endpoints[metric];
 }
@@ -225,7 +229,9 @@ function getChartEndpoint(metric) {
         'lags': '/api/schedule/lags-chart-data',
         'excessive-lags': '/api/schedule/excessive-lags-chart-data',
         'fs': '/api/schedule/fs-chart-data',
-        'non-fs': '/api/schedule/non-fs-chart-data'
+        'non-fs': '/api/schedule/non-fs-chart-data',
+        'open-ends': '/api/schedule/open-ends-chart-data',
+        'constraints': '/api/schedule/constraints-chart-data'
     };
     return endpoints[metric];
 }
@@ -236,7 +242,9 @@ function getHistoryEndpoint(metric) {
         'lags': '/api/schedule/lags-percentage-history',
         'excessive-lags': '/api/schedule/excessive-lags-percentage-history',
         'fs': '/api/schedule/fs-percentage-history',
-        'non-fs': '/api/schedule/non-fs-percentage-history'
+        'non-fs': '/api/schedule/non-fs-percentage-history',
+        'open-ends': '/api/schedule/open-ends-percentage-history',
+        'constraints': '/api/schedule/constraints-percentage-history'
     };
     
     return endpoints[metric] || endpoints['leads'];
@@ -248,7 +256,9 @@ function getTableEndpoint(metric) {
         'lags': '/api/schedule/lags',
         'excessive-lags': '/api/schedule/excessive-lags',
         'fs': '/api/schedule/fs',
-        'non-fs': '/api/schedule/non-fs'
+        'non-fs': '/api/schedule/non-fs',
+        'open-ends': '/api/schedule/open-ends',
+        'constraints': '/api/schedule/constraints'
     };
     return endpoints[metric];
 }
@@ -268,38 +278,45 @@ function getKPICards(data, metric) {
     switch (metric) {
         case 'leads':
             return [
-                { title: 'Total Relationships', value: data.Total_Relationship_Count || 0, icon: 'fas fa-list', color: 'blue' },
-                { title: 'Remaining Relationships', value: data.Remaining_Relationship_Count || 0, icon: 'fas fa-exclamation-triangle', color: 'red' },
-                { title: 'Leads', value: data.Leads_Count || 0, icon: 'fas fa-calendar', color: 'green' },
-                { title: 'Lead Percentage', value: (data.Lead_Percentage || 0).toFixed(2) + '%', icon: 'fas fa-arrow-right', color: 'purple' }
+                { title: 'Total Relationships', value: data.Total_Relationship_Count || 0, color: 'blue' },
+                { title: 'Remaining Relationships', value: data.Remaining_Relationship_Count || 0, color: 'red' },
+                { title: 'Leads', value: data.Leads_Count || 0, color: 'green' }
             ];
         case 'lags':
             return [
-                { title: 'Total Relationships', value: data.Total_Relationship_Count || 0, icon: 'fas fa-list', color: 'blue' },
-                { title: 'Remaining Relationships', value: data.Remaining_Relationship_Count || 0, icon: 'fas fa-exclamation-triangle', color: 'red' },
-                { title: 'Lags', value: data.Lags_Count || 0, icon: 'fas fa-clock', color: 'green' },
-                { title: 'Lag Percentage', value: (data.Lag_Percentage || 0).toFixed(2) + '%', icon: 'fas fa-chart-line', color: 'purple' }
+                { title: 'Total Relationships', value: data.Total_Relationship_Count || 0, color: 'blue' },
+                { title: 'Remaining Relationships', value: data.Remaining_Relationship_Count || 0, color: 'red' },
+                { title: 'Lags', value: data.Lags_Count || 0, color: 'green' }
             ];
         case 'excessive-lags':
             return [
-                { title: 'Total Relationships', value: data.Total_Relationship_Count || 0, icon: 'fas fa-list', color: 'blue' },
-                { title: 'Remaining Relationships', value: data.Remaining_Relationship_Count || 0, icon: 'fas fa-exclamation-triangle', color: 'red' },
-                { title: 'Excessive Lags', value: data.ExcessiveLags_Count || 0, icon: 'fas fa-clock', color: 'orange' },
-                { title: 'Excessive Lag %', value: (data.ExcessiveLag_Percentage || 0).toFixed(2) + '%', icon: 'fas fa-percentage', color: 'purple' }
+                { title: 'Total Relationships', value: data.Total_Relationship_Count || 0, color: 'blue' },
+                { title: 'Remaining Relationships', value: data.Remaining_Relationship_Count || 0, color: 'red' },
+                { title: 'Excessive Lags', value: data.ExcessiveLags_Count || 0, color: 'orange' }
             ];
         case 'fs':
             return [
-                { title: 'Total Relationships', value: data.Total_Relationship_Count || 0, icon: 'fas fa-list', color: 'blue' },
-                { title: 'Remaining Relationships', value: data.Remaining_Relationship_Count || 0, icon: 'fas fa-exclamation-triangle', color: 'red' },
-                { title: 'FS+0d', value: data.FS_Count || 0, icon: 'fas fa-link', color: 'green' },
-                { title: 'FS+0d Percentage', value: (data.FS_Percentage || 0).toFixed(2) + '%', icon: 'fas fa-percentage', color: 'purple' }
+                { title: 'Total Relationships', value: data.Total_Relationship_Count || 0, color: 'blue' },
+                { title: 'Remaining Relationships', value: data.Remaining_Relationship_Count || 0, color: 'red' },
+                { title: 'FS+0d', value: data.FS_Count || 0, color: 'green' }
             ];
         case 'non-fs':
             return [
-                { title: 'Total Relationships', value: data.Total_Relationship_Count || 0, icon: 'fas fa-list', color: 'blue' },
-                { title: 'Remaining Relationships', value: data.Remaining_Relationship_Count || 0, icon: 'fas fa-exclamation-triangle', color: 'red' },
-                { title: 'Non FS+0d', value: data.NonFS_Count || 0, icon: 'fas fa-link', color: 'orange' },
-                { title: 'Non FS+0d %', value: (data.NonFS_Percentage || 0).toFixed(2) + '%', icon: 'fas fa-percentage', color: 'purple' }
+                { title: 'Total Relationships', value: data.Total_Relationship_Count || 0, color: 'blue' },
+                { title: 'Remaining Relationships', value: data.Remaining_Relationship_Count || 0, color: 'red' },
+                { title: 'Non FS+0d', value: data.NonFS_Count || 0, color: 'orange' }
+            ];
+        case 'open-ends':
+            return [
+                { title: 'Open End Count', value: data.Open_End_Count || 0, color: 'teal' },
+                { title: 'Permissible Open Ends', value: data.Permissible_Open_Ends || 2, color: 'green' },
+                { title: 'Remaining Activities', value: data.Remaining_Activities || 0, color: 'blue' }
+            ];
+        case 'constraints':
+            return [
+                { title: 'Constraint Count', value: data.Constraint_Count || 0, color: 'indigo' },
+                { title: 'Remaining Activities', value: data.Remaining_Activities || 0, color: 'blue' },
+                { title: 'Constraints %', value: (data.Constraint_Percentage || 0).toFixed(2) + '%', color: 'purple' }
             ];
         default:
             return [];
@@ -308,16 +325,11 @@ function getKPICards(data, metric) {
 
 function createKPICard(card) {
     const div = document.createElement('div');
-    div.className = 'bg-white rounded-lg shadow p-6';
+    div.className = 'bg-white rounded-lg shadow p-2';
     div.innerHTML = `
-        <div class="flex items-center">
-            <div class="bg-${card.color}-100 p-3 rounded-full">
-                <i class="${card.icon} text-${card.color}-600 text-xl"></i>
-            </div>
-            <div class="ml-4">
-                <h3 class="text-gray-500 text-sm">${card.title}</h3>
-                <p class="text-xl font-semibold text-gray-800">${card.value}</p>
-            </div>
+        <div class="text-center">
+            <h3 class="text-gray-500 text-xs mb-1">${card.title}</h3>
+            <p class="text-sm font-medium text-${card.color}-600">${card.value}</p>
         </div>
     `;
     return div;
@@ -367,8 +379,8 @@ function createChart(ctx, data, metric) {
                 legend: {
                     position: 'bottom',
                     labels: {
-                        fontSize: 12,
-                        padding: 10,
+                        fontSize: 9,
+                        padding: 6,
                         usePointStyle: true
                     }
                 }
@@ -418,7 +430,15 @@ function createStackedColumnChart(ctx, data, metric) {
                     stacked: true,
                     title: {
                         display: true,
-                        text: xAxisLabel
+                        text: xAxisLabel,
+                        font: {
+                            size: 9
+                        }
+                    },
+                    ticks: {
+                        font: {
+                            size: 8
+                        }
                     }
                 },
                 y: {
@@ -426,7 +446,15 @@ function createStackedColumnChart(ctx, data, metric) {
                     beginAtZero: true,
                     title: {
                         display: true,
-                        text: 'Count'
+                        text: 'Count',
+                        font: {
+                            size: 9
+                        }
+                    },
+                    ticks: {
+                        font: {
+                            size: 8
+                        }
                     }
                 }
             },
@@ -434,8 +462,8 @@ function createStackedColumnChart(ctx, data, metric) {
                 legend: {
                     position: 'top',
                     labels: {
-                        fontSize: 12,
-                        padding: 10,
+                        fontSize: 9,
+                        padding: 6,
                         usePointStyle: true
                     }
                 }
@@ -514,12 +542,16 @@ function createHistoryChart(ctx, data, metric) {
                 y: {
                     beginAtZero: true,
                     ticks: {
-                        fontSize: 12
+                        font: {
+                            size: 8
+                        }
                     }
                 },
                 x: {
                     ticks: {
-                        fontSize: 12,
+                        font: {
+                            size: 8
+                        },
                         maxRotation: 45
                     }
                 }
@@ -528,8 +560,8 @@ function createHistoryChart(ctx, data, metric) {
                 legend: {
                     position: 'top',
                     labels: {
-                        fontSize: 12,
-                        padding: 10,
+                        fontSize: 9,
+                        padding: 6,
                         usePointStyle: true
                     }
                 }
@@ -564,7 +596,7 @@ function updateTableSection(data, metric) {
     const headerRow = document.createElement('tr');
     tableConfig.columns.forEach(column => {
         const th = document.createElement('th');
-        th.className = 'px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider';
+        th.className = 'px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider';
         th.textContent = column.title;
         headerRow.appendChild(th);
     });
@@ -577,8 +609,16 @@ function updateTableSection(data, metric) {
         
         tableConfig.columns.forEach(column => {
             const td = document.createElement('td');
-            td.className = 'px-4 py-2 text-sm text-gray-900';
-            td.textContent = row[column.field] || '';
+            td.className = 'px-2 py-1 text-xs text-gray-900 table-cell-compact';
+            
+            // Special formatting for Total Float Days - make it a whole number
+            if (column.field === 'Total Float Days' && row[column.field]) {
+                const floatValue = parseFloat(row[column.field]);
+                td.textContent = isNaN(floatValue) ? row[column.field] : Math.round(floatValue).toString();
+            } else {
+                td.textContent = row[column.field] || '';
+            }
+            
             tr.appendChild(td);
         });
         
@@ -588,7 +628,7 @@ function updateTableSection(data, metric) {
     // Show total count if more than 50 rows
     if (data.length > 50) {
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td colspan="${tableConfig.columns.length}" class="px-4 py-2 text-sm text-gray-500 text-center">Showing 50 of ${data.length} records</td>`;
+        tr.innerHTML = `<td colspan="${tableConfig.columns.length}" class="px-2 py-1 text-xs text-gray-500 text-center">Showing 50 of ${data.length} records</td>`;
         tableBody.appendChild(tr);
     }
 }
@@ -668,6 +708,36 @@ function getTableConfig(metric) {
                 { field: 'Driving', title: 'Driving' },
                 { field: 'FreeFloat', title: 'Free Float' },
                 { field: 'Relationship_Status', title: 'Rel. Status' }
+            ]
+        },
+        'open-ends': {
+            columns: [
+                { field: 'Activity ID', title: 'Activity ID' },
+                { field: 'Activity Name', title: 'Activity Name' },
+                { field: 'Start Date', title: 'Start Date' },
+                { field: 'Finish Date', title: 'Finish Date' },
+                { field: 'Original Duration', title: 'Original Duration' },
+                { field: 'Total Float Days', title: 'Total Float Days' },
+                { field: 'Missing Predecessor', title: 'Missing Predecessor' },
+                { field: 'Missing Successor', title: 'Missing Successor' },
+                { field: 'Primary Constraint', title: 'Primary Constraint' },
+                { field: 'Activity Type', title: 'Activity Type' },
+                { field: 'Activity Status', title: 'Activity Status' }
+            ]
+        },
+        'constraints': {
+            columns: [
+                { field: 'Activity ID', title: 'Activity ID' },
+                { field: 'Activity Name', title: 'Activity Name' },
+                { field: 'Start Date', title: 'Start Date' },
+                { field: 'Finish Date', title: 'Finish Date' },
+                { field: 'Original Duration', title: 'Original Duration' },
+                { field: 'Total Float Days', title: 'Total Float Days' },
+                { field: 'Primary Constraint', title: 'Primary Constraint' },
+                { field: 'Hard/Soft', title: 'Hard/Soft' },
+                { field: 'Activity Type', title: 'Activity Type' },
+                { field: 'Activity Status', title: 'Activity Status' },
+                { field: 'Open End', title: 'Open End' }
             ]
         }
     };

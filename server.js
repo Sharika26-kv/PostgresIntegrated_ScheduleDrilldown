@@ -2427,6 +2427,411 @@ app.post('/api/database/query', async (req, res) => {
     }
 });
 
+// ============================================================================
+// OPEN ENDS METRIC ENDPOINTS (based on activityanalysisview table)
+// ============================================================================
+
+// Open Ends KPI endpoint
+app.get('/api/schedule/open-ends-kpi', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        // Get Open Ends count (activities with OpenEnds = 'Open End')
+        let openEndFilters = ["openends = 'Open End'"];
+        const openEndParams = [];
+        
+        if (projectId && projectId !== 'all') {
+            openEndFilters.push('projectid = $1');
+            openEndParams.push(projectId);
+        }
+        
+        const openEndWhereClause = openEndFilters.length > 0 ? 'WHERE ' + openEndFilters.join(' AND ') : '';
+        const openEndQuery = `SELECT COUNT(*) as open_end_count FROM activityanalysisview ${openEndWhereClause}`;
+        
+        const openEndResult = await db.query(openEndQuery, openEndParams);
+        const openEndCount = openEndResult.rows[0]?.open_end_count || 0;
+        
+        // Get remaining activities count (activities that are not Complete)
+        let remainingFilters = ["activitystatus != 'Complete'"];
+        const remainingParams = [];
+        
+        if (projectId && projectId !== 'all') {
+            remainingFilters.push('projectid = $1');
+            remainingParams.push(projectId);
+        }
+        
+        const remainingWhereClause = remainingFilters.length > 0 ? 'WHERE ' + remainingFilters.join(' AND ') : '';
+        const remainingQuery = `SELECT COUNT(*) as remaining_count FROM activityanalysisview ${remainingWhereClause}`;
+        
+        const remainingResult = await db.query(remainingQuery, remainingParams);
+        const remainingCount = remainingResult.rows[0]?.remaining_count || 0;
+        
+        // Calculate percentage
+        const openEndPercentage = remainingCount > 0 ? Math.round((openEndCount * 100.0) / remainingCount * 100) / 100 : 0;
+        
+        // Permissible Open Ends (constant value as per your formula)
+        const permissibleOpenEnds = 2;
+        
+        res.json({
+            Open_End_Count: openEndCount,
+            Remaining_Activities: remainingCount,
+            Open_End_Percentage: openEndPercentage,
+            Permissible_Open_Ends: permissibleOpenEnds
+        });
+    } catch (error) {
+        console.error('[Schedule API] Error in open-ends-kpi endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch Open Ends KPI data' });
+    }
+});
+
+// Open Ends chart data endpoint
+app.get('/api/schedule/open-ends-chart-data', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        let filters = [];
+        const params = [];
+        
+        if (projectId && projectId !== 'all') {
+            filters.push('projectid = $1');
+            params.push(projectId);
+        }
+        
+        const whereClause = filters.length > 0 ? 'WHERE ' + filters.join(' AND ') : '';
+        
+        const query = `
+            SELECT 
+                CASE 
+                    WHEN openends = 'Open End' THEN 'Open End'
+                    ELSE 'Closed Activities'
+                END as details,
+                COUNT(*) as value
+            FROM activityanalysisview 
+            ${whereClause}
+            GROUP BY CASE 
+                WHEN openends = 'Open End' THEN 'Open End'
+                ELSE 'Closed Activities'
+            END
+            ORDER BY details
+        `;
+        
+        const result = await db.query(query, params);
+        const rows = result.rows;
+        
+        res.json(rows);
+    } catch (error) {
+        console.error('[Schedule API] Error in open-ends-chart-data endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch Open Ends chart data' });
+    }
+});
+
+// Open Ends history data endpoint
+app.get('/api/schedule/open-ends-percentage-history', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        // Calculate Open Ends percentage history using project table's last_recalc_date
+        let query = `
+            SELECT
+                TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM') as date,
+                COUNT(CASE WHEN a.openends = 'Open End' THEN 1 END) * 100.0 / 
+                NULLIF(COUNT(CASE WHEN a.activitystatus != 'Complete' THEN 1 END), 0) as percentage
+            FROM activityanalysisview a
+            INNER JOIN project p ON a.projectid = p.proj_id
+            WHERE p.last_recalc_date IS NOT NULL
+        `;
+        
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND a.projectid = $1`;
+            params.push(projectId);
+        }
+        
+        query += ` GROUP BY TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM') ORDER BY date`;
+
+        const result = await db.query(query, params);
+
+        const transformedData = result.rows.map(row => ({
+            date: row.date,
+            percentage: Math.round(row.percentage * 100) / 100
+        }));
+
+        res.json(transformedData);
+    } catch (error) {
+        console.error('[Schedule API] Error in open-ends-percentage-history endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch Open Ends history data' });
+    }
+});
+
+// Open Ends table data endpoint
+app.get('/api/schedule/open-ends', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        const limit = req.query.limit || 20;
+        
+        let filters = ["openends = 'Open End'"];
+        const params = [];
+        
+        if (projectId && projectId !== 'all') {
+            filters.push('projectid = $1');
+            params.push(projectId);
+        }
+        
+        const whereClause = filters.length > 0 ? 'WHERE ' + filters.join(' AND ') : '';
+        
+        const query = `
+            SELECT
+                activityid as "Activity ID",
+                activityname as "Activity Name",
+                startdate as "Start Date",
+                finishdate as "Finish Date",
+                originalduration as "Original Duration",
+                totalfloatdays as "Total Float Days",
+                CASE WHEN predecessor IS NULL OR predecessor = '' THEN 'Yes' ELSE 'No' END as "Missing Predecessor",
+                CASE WHEN successor IS NULL OR successor = '' THEN 'Yes' ELSE 'No' END as "Missing Successor",
+                primaryconstraint as "Primary Constraint",
+                activitytype as "Activity Type",
+                activitystatus as "Activity Status"
+            FROM activityanalysisview
+            ${whereClause}
+            ORDER BY activityid
+            LIMIT $${params.length + 1}
+        `;
+        
+        params.push(parseInt(limit));
+        
+        const result = await db.query(query, params);
+        const rows = result.rows;
+        
+        res.json(rows);
+    } catch (error) {
+        console.error('[Schedule API] Error in open-ends endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch Open Ends data' });
+    }
+});
+
+// Test endpoint to check table structure
+app.get('/api/schedule/test-table', async (req, res) => {
+    try {
+        // First check if the table exists
+        const tableCheckQuery = `
+            SELECT table_name 
+            FROM information_schema.tables 
+            WHERE table_schema = 'public' 
+            AND table_name LIKE '%activity%'
+        `;
+        
+        const tableResult = await db.query(tableCheckQuery);
+        console.log('[Test] Found tables:', tableResult.rows);
+        
+        // Try to get column info for activityanalysisview
+        const columnQuery = `
+            SELECT column_name, data_type 
+            FROM information_schema.columns 
+            WHERE table_name = 'activityanalysisview'
+            ORDER BY ordinal_position
+        `;
+        
+        const columnResult = await db.query(columnQuery);
+        console.log('[Test] Columns in activityanalysisview:', columnResult.rows);
+        
+        // Try a simple count query
+        const countQuery = `SELECT COUNT(*) as total_count FROM activityanalysisview LIMIT 1`;
+        const countResult = await db.query(countQuery);
+        console.log('[Test] Total rows in activityanalysisview:', countResult.rows[0]);
+        
+        res.json({
+            tables: tableResult.rows,
+            columns: columnResult.rows,
+            count: countResult.rows[0]
+        });
+    } catch (error) {
+        console.error('[Test] Error checking table:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============================================================================
+// END OPEN ENDS METRIC ENDPOINTS
+// ============================================================================
+
+// ============================================================================
+// CONSTRAINTS METRIC ENDPOINTS (based on activityanalysisview table)
+// ============================================================================
+
+// Constraints KPI endpoint
+app.get('/api/schedule/constraints-kpi', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        // Get Constraints count (activities with specific Primary Constraints)
+        let constraintFilters = ["primaryconstraint IN ('CS_MSO','CS_MSOB','CS_MSOA','CS_MEO','CS_MEOB','CS_MEOA','CS_ALAP')"];
+        const constraintParams = [];
+        
+        if (projectId && projectId !== 'all') {
+            constraintFilters.push('projectid = $1');
+            constraintParams.push(projectId);
+        }
+        
+        const constraintWhereClause = constraintFilters.length > 0 ? 'WHERE ' + constraintFilters.join(' AND ') : '';
+        const constraintQuery = `SELECT COUNT(*) as constraint_count FROM activityanalysisview ${constraintWhereClause}`;
+        
+        const constraintResult = await db.query(constraintQuery, constraintParams);
+        const constraintCount = constraintResult.rows[0]?.constraint_count || 0;
+        
+        // Get remaining activities count (activities that are not Complete)
+        let remainingFilters = ["activitystatus != 'Complete'"];
+        const remainingParams = [];
+        
+        if (projectId && projectId !== 'all') {
+            remainingFilters.push('projectid = $1');
+            remainingParams.push(projectId);
+        }
+        
+        const remainingWhereClause = remainingFilters.length > 0 ? 'WHERE ' + remainingFilters.join(' AND ') : '';
+        const remainingQuery = `SELECT COUNT(*) as remaining_count FROM activityanalysisview ${remainingWhereClause}`;
+        
+        const remainingResult = await db.query(remainingQuery, remainingParams);
+        const remainingCount = remainingResult.rows[0]?.remaining_count || 0;
+        
+        // Calculate percentage
+        const constraintPercentage = remainingCount > 0 ? Math.round((constraintCount * 100.0) / remainingCount * 100) / 100 : 0;
+        
+        res.json({
+            Constraint_Count: constraintCount,
+            Remaining_Activities: remainingCount,
+            Constraint_Percentage: constraintPercentage
+        });
+    } catch (error) {
+        console.error('[Schedule API] Error in constraints-kpi endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch Constraints KPI data' });
+    }
+});
+
+// Constraints chart data endpoint (donut chart by HardOrSoftConstraint and ActivityType)
+app.get('/api/schedule/constraints-chart-data', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        let filters = ["primaryconstraint IN ('CS_MSO','CS_MSOB','CS_MSOA','CS_MEO','CS_MEOB','CS_MEOA','CS_ALAP')"];
+        const params = [];
+        
+        if (projectId && projectId !== 'all') {
+            filters.push('projectid = $1');
+            params.push(projectId);
+        }
+        
+        const whereClause = filters.length > 0 ? 'WHERE ' + filters.join(' AND ') : '';
+        
+        const query = `
+            SELECT 
+                COALESCE(hardorsoftconstraint, 'Unknown') || ' - ' || COALESCE(activitytype, 'Unknown') as details,
+                COUNT(*) as value
+            FROM activityanalysisview 
+            ${whereClause}
+            GROUP BY hardorsoftconstraint, activitytype
+            ORDER BY hardorsoftconstraint, activitytype
+        `;
+        
+        const result = await db.query(query, params);
+        const rows = result.rows;
+        
+        res.json(rows);
+    } catch (error) {
+        console.error('[Schedule API] Error in constraints-chart-data endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch Constraints chart data' });
+    }
+});
+
+// Constraints history data endpoint (line chart by month/year)
+app.get('/api/schedule/constraints-percentage-history', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        // Calculate Constraints percentage history using project table's last_recalc_date
+        let query = `
+            SELECT
+                TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM') as date,
+                COUNT(CASE WHEN a.primaryconstraint IN ('CS_MSO','CS_MSOB','CS_MSOA','CS_MEO','CS_MEOB','CS_MEOA','CS_ALAP') THEN 1 END) * 100.0 / 
+                NULLIF(COUNT(CASE WHEN a.activitystatus != 'Complete' THEN 1 END), 0) as percentage
+            FROM activityanalysisview a
+            INNER JOIN project p ON a.projectid = p.proj_id
+            WHERE p.last_recalc_date IS NOT NULL
+        `;
+        
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND a.projectid = $1`;
+            params.push(projectId);
+        }
+        
+        query += ` GROUP BY TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM') ORDER BY date`;
+
+        const result = await db.query(query, params);
+
+        const transformedData = result.rows.map(row => ({
+            date: row.date,
+            percentage: Math.round(row.percentage * 100) / 100
+        }));
+
+        res.json(transformedData);
+    } catch (error) {
+        console.error('[Schedule API] Error in constraints-percentage-history endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch Constraints history data' });
+    }
+});
+
+// Constraints table data endpoint
+app.get('/api/schedule/constraints', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        const limit = req.query.limit || 20;
+        
+        let filters = ["primaryconstraint IN ('CS_MSO','CS_MSOB','CS_MSOA','CS_MEO','CS_MEOB','CS_MEOA','CS_ALAP')"];
+        const params = [];
+        
+        if (projectId && projectId !== 'all') {
+            filters.push('projectid = $1');
+            params.push(projectId);
+        }
+        
+        const whereClause = filters.length > 0 ? 'WHERE ' + filters.join(' AND ') : '';
+        
+        const query = `
+            SELECT
+                activityid as "Activity ID",
+                activityname as "Activity Name",
+                startdate as "Start Date",
+                finishdate as "Finish Date",
+                originalduration as "Original Duration",
+                totalfloatdays as "Total Float Days",
+                primaryconstraint as "Primary Constraint",
+                hardorsoftconstraint as "Hard/Soft",
+                activitytype as "Activity Type",
+                activitystatus as "Activity Status",
+                openends as "Open End"
+            FROM activityanalysisview
+            ${whereClause}
+            ORDER BY activityid
+            LIMIT $${params.length + 1}
+        `;
+        
+        params.push(parseInt(limit));
+        
+        const result = await db.query(query, params);
+        const rows = result.rows;
+        
+        res.json(rows);
+    } catch (error) {
+        console.error('[Schedule API] Error in constraints endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch Constraints data' });
+    }
+});
+
+// ============================================================================
+// END CONSTRAINTS METRIC ENDPOINTS
+// ============================================================================
+
 // Fallback route for SPA - Moved to after all API endpoints
 app.get('*', (req, res) => {
   // Don't serve index.html for API routes
