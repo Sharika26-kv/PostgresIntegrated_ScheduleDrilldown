@@ -12,6 +12,8 @@ require('dotenv').config();
 
 // Import Gantt Chart API endpoints
 const ganttApi = require('./api/gantt-endpoints');
+// Import Schedule API endpoints
+const scheduleApi = require('./api/schedule-endpoints');
 
 const app = express();
 const PORT = process.env.BACKEND_PORT || 3001; // Use a different port than the frontend dev server
@@ -356,6 +358,12 @@ app.get('/api/gantt/projects/:projectId/tasks', ganttApi.getProjectTasks);
 app.get('/api/gantt/projects/:projectId/wbs', ganttApi.getProjectWBS);
 app.get('/api/gantt/projects/:projectId/dependencies', ganttApi.getProjectDependencies);
 app.get('/api/gantt/projects/:projectId/resources', ganttApi.getProjectResources);
+
+// Register Schedule API routes
+app.get('/api/schedule/resources-kpi', scheduleApi.getResourcesKPI);
+app.get('/api/schedule/resources-chart-data', scheduleApi.getResourcesChartData);
+app.get('/api/schedule/resources-percentage-history', scheduleApi.getResourcesPercentageHistory);
+app.get('/api/schedule/resources', scheduleApi.getResourcesTableData);
 
 // AWP-specific endpoints
 app.get('/api/awp/projects/:projectId/hierarchy', ganttApi.getAWPHierarchy);
@@ -2832,7 +2840,1070 @@ app.get('/api/schedule/constraints', async (req, res) => {
 // END CONSTRAINTS METRIC ENDPOINTS
 // ============================================================================
 
-// Fallback route for SPA - Moved to after all API endpoints
+// Excessive Durations KPI endpoint
+app.get('/api/schedule/excessive-durations-kpi', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        const params = [];
+        let projectFilter = '';
+        
+        if (projectId && projectId !== 'all') {
+            projectFilter = 'WHERE projectid = $1';
+            params.push(projectId);
+        }
+
+        // Get ED Count and Remaining Activities
+        const query = `
+            WITH metrics AS (
+                SELECT 
+                    COUNT(*) FILTER (WHERE CAST(originalduration AS INTEGER) >= 20 AND activitystatus IN ('Active', 'NotStart')) as ed_count,
+                    COUNT(*) FILTER (WHERE activitystatus IN ('Active', 'NotStart')) as remaining_activities
+                FROM activityanalysisview
+                ${projectFilter}
+            )
+            SELECT 
+                ed_count as "ED_Count",
+                remaining_activities as "Remaining_Activities",
+                CASE 
+                    WHEN remaining_activities > 0 
+                    THEN CAST(ROUND(CAST((ed_count::numeric / remaining_activities::numeric * 100) AS numeric), 1) AS numeric)
+                    ELSE 0 
+                END as "Excessive_Duration_Percentage"
+            FROM metrics
+        `;
+
+        console.log('Executing query:', query);
+        console.log('With params:', params);
+
+        const result = await db.query(query, params);
+        console.log('Query result:', result.rows[0]);
+        
+        if (!result.rows[0]) {
+            throw new Error('No data returned from query');
+        }
+        
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('[Schedule API] Error in excessive-durations-kpi endpoint:', error);
+        console.error('[Schedule API] Error details:', error.stack);
+        res.status(500).json({ error: `Failed to fetch Excessive Durations KPI data: ${error.message}` });
+    }
+});
+
+// Excessive Durations Chart Data endpoint
+app.get('/api/schedule/excessive-durations-chart-data', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        const params = [];
+        let projectFilter = '';
+        
+        if (projectId && projectId !== 'all') {
+            projectFilter = 'AND projectid = $1';
+            params.push(projectId);
+        }
+
+        // Get distribution of activities by status and duration category
+        const query = `
+            WITH ActivityCategories AS (
+                SELECT 
+                    CASE 
+                        WHEN CAST(originalduration AS INTEGER) >= 20 THEN 'Excessive Duration'
+                        ELSE 'Normal Duration'
+                    END as duration_category,
+                    activitystatus,
+                    COUNT(*) as count
+                FROM activityanalysisview
+                WHERE activitystatus IN ('Active', 'NotStart')
+                ${projectFilter}
+                GROUP BY 
+                    CASE 
+                        WHEN CAST(originalduration AS INTEGER) >= 20 THEN 'Excessive Duration'
+                        ELSE 'Normal Duration'
+                    END,
+                    activitystatus
+            )
+            SELECT
+                duration_category,
+                activitystatus as status,
+                count
+            FROM ActivityCategories
+            ORDER BY duration_category, activitystatus
+        `;
+
+        console.log('Executing chart query:', query);
+        console.log('With params:', params);
+
+        const result = await db.query(query, params);
+        res.json(result.rows);
+    } catch (error) {
+        console.error('[Schedule API] Error in excessive-durations-chart-data endpoint:', error);
+        console.error('[Schedule API] Error details:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Excessive Durations Percentage History endpoint
+app.get('/api/schedule/excessive-durations-percentage-history', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        // Calculate Excessive Durations percentage history using project table's last_recalc_date
+        let query = `
+            WITH ActivityMetrics AS (
+                SELECT 
+                    p.last_recalc_date::DATE as calc_date,
+                    COUNT(CASE WHEN CAST(a.originalduration AS INTEGER) >= 20 AND a.activitystatus IN ('Active', 'NotStart') THEN 1 END) as ed_count,
+                    COUNT(CASE WHEN a.activitystatus IN ('Active', 'NotStart') THEN 1 END) as total_count
+                FROM activityanalysisview a
+                INNER JOIN project p ON a.projectid = p.proj_id
+                WHERE p.last_recalc_date IS NOT NULL
+        `;
+        
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND a.projectid = $1`;
+            params.push(projectId);
+        }
+        
+        query += `
+                GROUP BY p.last_recalc_date::DATE
+            )
+            SELECT 
+                TO_CHAR(calc_date, 'YYYY-MM') as date,
+                CASE 
+                    WHEN total_count > 0 THEN ROUND(CAST(ed_count AS NUMERIC) * 100.0 / total_count, 1)
+                    ELSE 0 
+                END as percentage
+            FROM ActivityMetrics
+            ORDER BY calc_date ASC
+        `;
+
+        console.log('Executing query:', query);
+        console.log('With params:', params);
+
+        const result = await db.query(query, params);
+        console.log('Query result:', result.rows);
+
+        const transformedData = result.rows.map(row => ({
+            date: row.date,
+            percentage: parseFloat(row.percentage) || 0
+        }));
+
+        res.json(transformedData);
+    } catch (error) {
+        console.error('[Schedule API] Error in excessive-durations-percentage-history endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch Excessive Durations history data' });
+    }
+});
+
+// Excessive Durations Table Data endpoint
+app.get('/api/schedule/excessive-durations', async (req, res) => {
+    try {
+        const limit = req.query.limit || 20;
+        const projectId = req.query.project_id;
+        const params = [limit];
+        let projectFilter = '';
+        
+        if (projectId && projectId !== 'all') {
+            projectFilter = 'AND projectid = $2';
+            params.push(projectId);
+        }
+
+        const query = `
+            SELECT
+                activityid as "Activity ID",
+                activityname as "Activity Name",
+                startdate as "Start Date",
+                finishdate as "Finish Date",
+                originalduration as "Original Duration",
+                totalfloatdays as "Total Float Days",
+                primaryconstraint as "Primary Constraint",
+                activitytype as "Activity Type",
+                activitystatus as "Activity Status"
+            FROM activityanalysisview
+            WHERE CAST(originalduration AS INTEGER) >= 20
+            AND activitystatus IN ('Active', 'NotStart')
+            ${projectFilter}
+            ORDER BY CAST(originalduration AS INTEGER) DESC
+            LIMIT $1
+        `;
+
+        console.log('Executing table query:', query);
+        console.log('With params:', params);
+
+        const result = await db.query(query, params);
+        console.log('Table query result:', result.rows);
+        res.json(result.rows);
+    } catch (error) {
+        console.error('[Schedule API] Error in excessive-durations endpoint:', error);
+        console.error('[Schedule API] Error details:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Negative Total Float KPI endpoint
+app.get('/api/schedule/negative-float-kpi', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        const params = [];
+        let projectFilter = '';
+        
+        if (projectId && projectId !== 'all') {
+            projectFilter = 'WHERE projectid = $1';
+            params.push(projectId);
+        }
+
+        // Get NTF Count and Remaining Activities
+        const query = `
+            WITH metrics AS (
+                SELECT 
+                    COUNT(*) FILTER (WHERE totalfloatdays < 0 AND activitystatus IN ('Active', 'NotStart')) as ntf_count,
+                    COUNT(*) FILTER (WHERE activitystatus IN ('Active', 'NotStart')) as remaining_activities
+                FROM activityanalysisview
+                ${projectFilter}
+            )
+            SELECT 
+                ntf_count as "NTF_Count",
+                remaining_activities as "Remaining_Activities",
+                CASE 
+                    WHEN remaining_activities > 0 
+                    THEN CAST(ROUND(CAST((ntf_count::numeric / remaining_activities::numeric * 100) AS numeric), 1) AS numeric)
+                    ELSE 0 
+                END as "Negative_Float_Percentage"
+            FROM metrics
+        `;
+
+        const result = await db.query(query, params);
+        
+        if (!result.rows[0]) {
+            throw new Error('No data returned from query');
+        }
+        
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('[Schedule API] Error in negative-float-kpi endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch Negative Total Float KPI data' });
+    }
+});
+
+// Negative Total Float Chart Data endpoint
+app.get('/api/schedule/negative-float-chart-data', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        const params = [];
+        let projectFilter = '';
+        
+        if (projectId && projectId !== 'all') {
+            projectFilter = 'AND projectid = $1';
+            params.push(projectId);
+        }
+
+        // Get scatter plot data with filter for negative float days
+        const query = `
+            SELECT 
+                activitystatus as status,
+                totalfloatdays as float_days,
+                COUNT(*) as activity_count
+            FROM activityanalysisview
+            WHERE activitystatus IN ('Active', 'NotStart')
+            AND totalfloatdays < 0
+            ${projectFilter}
+            GROUP BY activitystatus, totalfloatdays
+            ORDER BY activitystatus, totalfloatdays
+        `;
+
+        const result = await db.query(query, params);
+        res.json(result.rows);
+    } catch (error) {
+        console.error('[Schedule API] Error in negative-float-chart-data endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch Negative Total Float chart data' });
+    }
+});
+
+// Negative Total Float Percentage History endpoint
+app.get('/api/schedule/negative-float-percentage-history', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        // Calculate Negative Float percentage history using project table's last_recalc_date
+        let query = `
+            WITH ActivityMetrics AS (
+                SELECT 
+                    p.last_recalc_date::DATE as calc_date,
+                    COUNT(CASE WHEN a.totalfloatdays < 0 AND a.activitystatus IN ('Active', 'NotStart') THEN 1 END) as ntf_count,
+                    COUNT(CASE WHEN a.activitystatus IN ('Active', 'NotStart') THEN 1 END) as total_count
+                FROM activityanalysisview a
+                INNER JOIN project p ON a.projectid = p.proj_id
+                WHERE p.last_recalc_date IS NOT NULL
+        `;
+        
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND a.projectid = $1`;
+            params.push(projectId);
+        }
+        
+        query += `
+                GROUP BY p.last_recalc_date::DATE
+            )
+            SELECT 
+                TO_CHAR(calc_date, 'YYYY-MM') as date,
+                CASE 
+                    WHEN total_count > 0 THEN ROUND(CAST(ntf_count AS NUMERIC) * 100.0 / total_count, 1)
+                    ELSE 0 
+                END as percentage
+            FROM ActivityMetrics
+            ORDER BY calc_date ASC
+        `;
+
+        const result = await db.query(query, params);
+
+        const transformedData = result.rows.map(row => ({
+            date: row.date,
+            percentage: parseFloat(row.percentage) || 0
+        }));
+
+        res.json(transformedData);
+    } catch (error) {
+        console.error('[Schedule API] Error in negative-float-percentage-history endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch Negative Total Float history data' });
+    }
+});
+
+// Negative Total Float Table Data endpoint
+app.get('/api/schedule/negative-float', async (req, res) => {
+    try {
+        const limit = req.query.limit || 20;
+        const projectId = req.query.project_id;
+        const params = [limit];
+        let projectFilter = '';
+        
+        if (projectId && projectId !== 'all') {
+            projectFilter = 'AND projectid = $2';
+            params.push(projectId);
+        }
+
+        const query = `
+            SELECT
+                activityid as "Activity ID",
+                activityname as "Activity Name",
+                startdate as "Start Date",
+                finishdate as "Finish Date",
+                originalduration as "Original Duration",
+                totalfloatdays as "Total Float Days",
+                primaryconstraint as "Primary Constraint",
+                activitytype as "Activity Type",
+                activitystatus as "Activity Status"
+            FROM activityanalysisview
+            WHERE totalfloatdays < 0
+            AND activitystatus IN ('Active', 'NotStart')
+            ${projectFilter}
+            ORDER BY totalfloatdays ASC
+            LIMIT $1
+        `;
+
+        const result = await db.query(query, params);
+        res.json(result.rows);
+    } catch (error) {
+        console.error('[Schedule API] Error in negative-float endpoint:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Critical Total Float KPI endpoint
+app.get('/api/schedule/critical-float-kpi', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        const params = [];
+        let projectFilter = '';
+        
+        if (projectId && projectId !== 'all') {
+            projectFilter = 'WHERE projectid = $1';
+            params.push(projectId);
+        }
+
+        // Get CTF Count and Remaining Activities
+        const query = `
+            WITH metrics AS (
+                SELECT 
+                    COUNT(*) FILTER (WHERE totalfloatdays >= 0 AND totalfloatdays <= 15 AND activitystatus IN ('Active', 'NotStart')) as ctf_count,
+                    COUNT(*) FILTER (WHERE activitystatus IN ('Active', 'NotStart')) as remaining_activities
+                FROM activityanalysisview
+                ${projectFilter}
+            )
+            SELECT 
+                ctf_count as "CTF_Count",
+                remaining_activities as "Remaining_Activities",
+                CASE 
+                    WHEN remaining_activities > 0 
+                    THEN CAST(ROUND(CAST((ctf_count::numeric / remaining_activities::numeric * 100) AS numeric), 1) AS numeric)
+                    ELSE 0 
+                END as "Critical_Float_Percentage"
+            FROM metrics
+        `;
+
+        const result = await db.query(query, params);
+        
+        if (!result.rows[0]) {
+            throw new Error('No data returned from query');
+        }
+        
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('[Schedule API] Error in critical-float-kpi endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch Critical Total Float KPI data' });
+    }
+});
+
+// Critical Total Float Chart Data endpoint
+app.get('/api/schedule/critical-float-chart-data', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        const params = [];
+        let projectFilter = '';
+        
+        if (projectId && projectId !== 'all') {
+            projectFilter = 'AND projectid = $1';
+            params.push(projectId);
+        }
+
+        // Get scatter plot data with the specific filter condition (0 <= Total Float Days <= 15)
+        const query = `
+            SELECT 
+                activitystatus as status,
+                totalfloatdays as float_days,
+                COUNT(*) as activity_count
+            FROM activityanalysisview
+            WHERE activitystatus IN ('Active', 'NotStart')
+            AND totalfloatdays >= 0 AND totalfloatdays <= 15
+            ${projectFilter}
+            GROUP BY activitystatus, totalfloatdays
+            ORDER BY activitystatus, totalfloatdays
+        `;
+
+        const result = await db.query(query, params);
+        res.json(result.rows);
+    } catch (error) {
+        console.error('[Schedule API] Error in critical-float-chart-data endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch Critical Total Float chart data' });
+    }
+});
+
+// Critical Total Float Percentage History endpoint
+app.get('/api/schedule/critical-float-percentage-history', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        // Calculate Critical Float percentage history using project table's last_recalc_date
+        let query = `
+            WITH ActivityMetrics AS (
+                SELECT 
+                    p.last_recalc_date::DATE as calc_date,
+                    COUNT(CASE WHEN a.totalfloatdays >= 0 AND a.totalfloatdays <= 15 AND a.activitystatus IN ('Active', 'NotStart') THEN 1 END) as ctf_count,
+                    COUNT(CASE WHEN a.activitystatus IN ('Active', 'NotStart') THEN 1 END) as total_count
+                FROM activityanalysisview a
+                INNER JOIN project p ON a.projectid = p.proj_id
+                WHERE p.last_recalc_date IS NOT NULL
+        `;
+        
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND a.projectid = $1`;
+            params.push(projectId);
+        }
+        
+        query += `
+                GROUP BY p.last_recalc_date::DATE
+            )
+            SELECT 
+                TO_CHAR(calc_date, 'YYYY-MM') as date,
+                CASE 
+                    WHEN total_count > 0 THEN ROUND(CAST(ctf_count AS NUMERIC) * 100.0 / total_count, 1)
+                    ELSE 0 
+                END as percentage
+            FROM ActivityMetrics
+            ORDER BY calc_date ASC
+        `;
+
+        const result = await db.query(query, params);
+
+        const transformedData = result.rows.map(row => ({
+            date: row.date,
+            percentage: parseFloat(row.percentage) || 0
+        }));
+
+        res.json(transformedData);
+    } catch (error) {
+        console.error('[Schedule API] Error in critical-float-percentage-history endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch Critical Total Float history data' });
+    }
+});
+
+// Critical Total Float Table Data endpoint
+app.get('/api/schedule/critical-float', async (req, res) => {
+    try {
+        const limit = req.query.limit || 20;
+        const projectId = req.query.project_id;
+        const params = [limit];
+        let projectFilter = '';
+        
+        if (projectId && projectId !== 'all') {
+            projectFilter = 'AND projectid = $2';
+            params.push(projectId);
+        }
+
+        const query = `
+            SELECT
+                activityid as "Activity ID",
+                activityname as "Activity Name",
+                startdate as "Start Date",
+                finishdate as "Finish Date",
+                originalduration as "Original Duration",
+                totalfloatdays as "Total Float Days",
+                primaryconstraint as "Primary Constraint",
+                activitytype as "Activity Type",
+                activitystatus as "Activity Status"
+            FROM activityanalysisview
+            WHERE totalfloatdays >= 0 AND totalfloatdays <= 15
+            AND activitystatus IN ('Active', 'NotStart')
+            ${projectFilter}
+            ORDER BY totalfloatdays ASC
+            LIMIT $1
+        `;
+
+        const result = await db.query(query, params);
+        res.json(result.rows);
+    } catch (error) {
+        console.error('[Schedule API] Error in critical-float endpoint:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Excessive Total Float KPI endpoint
+app.get('/api/schedule/excessive-float-kpi', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        const params = [];
+        let projectFilter = '';
+        
+        if (projectId && projectId !== 'all') {
+            projectFilter = 'WHERE projectid = $1';
+            params.push(projectId);
+        }
+
+        // Get ETF Count and Remaining Activities
+        const query = `
+            WITH metrics AS (
+                SELECT 
+                    COUNT(*) FILTER (WHERE totalfloatdays >= 40 AND activitystatus IN ('Active', 'NotStart')) as etf_count,
+                    COUNT(*) FILTER (WHERE activitystatus IN ('Active', 'NotStart')) as remaining_activities
+                FROM activityanalysisview
+                ${projectFilter}
+            )
+            SELECT 
+                etf_count as "ETF_Count",
+                remaining_activities as "Remaining_Activities",
+                CASE 
+                    WHEN remaining_activities > 0 
+                    THEN CAST(ROUND(CAST((etf_count::numeric / remaining_activities::numeric * 100) AS numeric), 1) AS numeric)
+                    ELSE 0 
+                END as "Excessive_Float_Percentage"
+            FROM metrics
+        `;
+
+        const result = await db.query(query, params);
+        
+        if (!result.rows[0]) {
+            throw new Error('No data returned from query');
+        }
+        
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('[Schedule API] Error in excessive-float-kpi endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch Excessive Total Float KPI data' });
+    }
+});
+
+// Excessive Total Float Chart Data endpoint
+app.get('/api/schedule/excessive-float-chart-data', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        const params = [];
+        let projectFilter = '';
+        
+        if (projectId && projectId !== 'all') {
+            projectFilter = 'AND projectid = $1';
+            params.push(projectId);
+        }
+
+        // Get scatter plot data with filter for excessive float days (>= 40)
+        const query = `
+            WITH ActivityCounts AS (
+                SELECT 
+                    activitystatus,
+                    totalfloatdays,
+                    COUNT(*) OVER (PARTITION BY activitystatus) as total_by_status,
+                    COUNT(*) as count_per_float
+                FROM activityanalysisview
+                WHERE activitystatus IN ('Active', 'NotStart')
+                AND totalfloatdays >= 40
+                ${projectFilter}
+                GROUP BY activitystatus, totalfloatdays
+            )
+            SELECT 
+                activitystatus as status,
+                totalfloatdays as float_days,
+                count_per_float as activity_count,
+                total_by_status
+            FROM ActivityCounts
+            ORDER BY activitystatus, totalfloatdays`;
+
+        const result = await db.query(query, params);
+        res.json(result.rows);
+    } catch (error) {
+        console.error('[Schedule API] Error in excessive-float-chart-data endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch Excessive Total Float chart data' });
+    }
+});
+
+// Excessive Total Float Percentage History endpoint
+app.get('/api/schedule/excessive-float-percentage-history', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        // Calculate Excessive Float percentage history using project table's last_recalc_date
+        let query = `
+            WITH ActivityMetrics AS (
+                SELECT 
+                    p.last_recalc_date::DATE as calc_date,
+                    COUNT(CASE WHEN a.totalfloatdays >= 40 AND a.activitystatus IN ('Active', 'NotStart') THEN 1 END) as etf_count,
+                    COUNT(CASE WHEN a.activitystatus IN ('Active', 'NotStart') THEN 1 END) as total_count
+                FROM activityanalysisview a
+                INNER JOIN project p ON a.projectid = p.proj_id
+                WHERE p.last_recalc_date IS NOT NULL
+        `;
+        
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND a.projectid = $1`;
+            params.push(projectId);
+        }
+        
+        query += `
+                GROUP BY p.last_recalc_date::DATE
+            )
+            SELECT 
+                TO_CHAR(calc_date, 'YYYY-MM') as date,
+                CASE 
+                    WHEN total_count > 0 THEN ROUND(CAST(etf_count AS NUMERIC) * 100.0 / total_count, 1)
+                    ELSE 0 
+                END as percentage
+            FROM ActivityMetrics
+            ORDER BY calc_date ASC
+        `;
+
+        const result = await db.query(query, params);
+
+        const transformedData = result.rows.map(row => ({
+            date: row.date,
+            percentage: parseFloat(row.percentage) || 0
+        }));
+
+        res.json(transformedData);
+    } catch (error) {
+        console.error('[Schedule API] Error in excessive-float-percentage-history endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch Excessive Total Float history data' });
+    }
+});
+
+// Excessive Total Float Table Data endpoint
+app.get('/api/schedule/excessive-float', async (req, res) => {
+    try {
+        const limit = req.query.limit || 20;
+        const projectId = req.query.project_id;
+        const params = [limit];
+        let projectFilter = '';
+        
+        if (projectId && projectId !== 'all') {
+            projectFilter = 'AND projectid = $2';
+            params.push(projectId);
+        }
+
+        const query = `
+            SELECT
+                activityid as "Activity ID",
+                activityname as "Activity Name",
+                startdate as "Start Date",
+                finishdate as "Finish Date",
+                originalduration as "Original Duration",
+                totalfloatdays as "Total Float Days",
+                primaryconstraint as "Primary Constraint",
+                activitytype as "Activity Type",
+                activitystatus as "Activity Status"
+            FROM activityanalysisview
+            WHERE totalfloatdays >= 40
+            AND activitystatus IN ('Active', 'NotStart')
+            ${projectFilter}
+            ORDER BY totalfloatdays DESC
+            LIMIT $1
+        `;
+
+        const result = await db.query(query, params);
+        res.json(result.rows);
+    } catch (error) {
+        console.error('[Schedule API] Error in excessive-float endpoint:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Invalid Dates KPI endpoint
+app.get('/api/schedule/invalid-dates-kpi', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        const params = [];
+        let projectFilter = '';
+        
+        if (projectId && projectId !== 'all') {
+            projectFilter = 'WHERE projectid = $1';
+            params.push(projectId);
+        }
+
+        // Get Invalid Dates Count and Remaining Activities
+        const query = `
+            WITH metrics AS (
+                SELECT 
+                    COUNT(*) FILTER (WHERE (invalidstart = 'Invalid' OR invalidfinish = 'Invalid') AND activitystatus IN ('Active', 'NotStart')) as ind_count,
+                    COUNT(*) FILTER (WHERE activitystatus IN ('Active', 'NotStart')) as remaining_activities
+                FROM activityanalysisview
+                ${projectFilter}
+            )
+            SELECT 
+                ind_count as "IND_Count",
+                remaining_activities as "Remaining_Activities",
+                CASE 
+                    WHEN remaining_activities > 0 
+                    THEN CAST(ROUND(CAST((ind_count::numeric / remaining_activities::numeric * 100) AS numeric), 1) AS numeric)
+                    ELSE 0 
+                END as "Invalid_Dates_Percentage"
+            FROM metrics
+        `;
+
+        const result = await db.query(query, params);
+        
+        if (!result.rows[0]) {
+            throw new Error('No data returned from query');
+        }
+        
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('[Schedule API] Error in invalid-dates-kpi endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch Invalid Dates KPI data' });
+    }
+});
+
+// Invalid Dates Chart Data endpoint
+app.get('/api/schedule/invalid-dates-chart-data', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        const params = [];
+        let projectFilter = '';
+        
+        if (projectId && projectId !== 'all') {
+            projectFilter = 'AND projectid = $1';
+            params.push(projectId);
+        }
+
+        // Get donut chart data by activity type
+        const query = `
+            SELECT 
+                activitytype,
+                COUNT(*) as count
+            FROM activityanalysisview
+            WHERE (invalidstart = 'Invalid' OR invalidfinish = 'Invalid')
+            AND activitystatus IN ('Active', 'NotStart')
+            ${projectFilter}
+            GROUP BY activitytype
+            ORDER BY count DESC
+        `;
+
+        const result = await db.query(query, params);
+        res.json(result.rows);
+    } catch (error) {
+        console.error('[Schedule API] Error in invalid-dates-chart-data endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch Invalid Dates chart data' });
+    }
+});
+
+// Invalid Dates Percentage History endpoint
+app.get('/api/schedule/invalid-dates-percentage-history', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        // Calculate Invalid Dates percentage history using project table's last_recalc_date
+        let query = `
+            WITH ActivityMetrics AS (
+                SELECT 
+                    p.last_recalc_date::DATE as calc_date,
+                    COUNT(CASE WHEN (a.invalidstart = 'Invalid' OR a.invalidfinish = 'Invalid') AND a.activitystatus IN ('Active', 'NotStart') THEN 1 END) as ind_count,
+                    COUNT(CASE WHEN a.activitystatus IN ('Active', 'NotStart') THEN 1 END) as total_count
+                FROM activityanalysisview a
+                INNER JOIN project p ON a.projectid = p.proj_id
+                WHERE p.last_recalc_date IS NOT NULL
+        `;
+        
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND a.projectid = $1`;
+            params.push(projectId);
+        }
+        
+        query += `
+                GROUP BY p.last_recalc_date::DATE
+            )
+            SELECT 
+                TO_CHAR(calc_date, 'YYYY-MM') as date,
+                CASE 
+                    WHEN total_count > 0 THEN ROUND(CAST(ind_count AS NUMERIC) * 100.0 / total_count, 1)
+                    ELSE 0 
+                END as percentage
+            FROM ActivityMetrics
+            ORDER BY calc_date ASC
+        `;
+
+        const result = await db.query(query, params);
+
+        const transformedData = result.rows.map(row => ({
+            date: row.date,
+            percentage: parseFloat(row.percentage) || 0
+        }));
+
+        res.json(transformedData);
+    } catch (error) {
+        console.error('[Schedule API] Error in invalid-dates-percentage-history endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch Invalid Dates history data' });
+    }
+});
+
+// Invalid Dates Table Data endpoint
+app.get('/api/schedule/invalid-dates', async (req, res) => {
+    try {
+        const limit = req.query.limit || 20;
+        const projectId = req.query.project_id;
+        const params = [limit];
+        let projectFilter = '';
+        
+        if (projectId && projectId !== 'all') {
+            projectFilter = 'AND projectid = $2';
+            params.push(projectId);
+        }
+
+        const query = `
+            SELECT
+                activityid as "Activity ID",
+                activityname as "Activity Name",
+                startdate as "Start Date",
+                finishdate as "Finish Date",
+                invalidstart as "Invalid Start",
+                invalidfinish as "Invalid Finish",
+                activitytype as "Activity Type",
+                activitystatus as "Activity Status"
+            FROM activityanalysisview
+            WHERE (invalidstart = 'Invalid' OR invalidfinish = 'Invalid')
+            AND activitystatus IN ('Active', 'NotStart')
+            ${projectFilter}
+            ORDER BY activityid ASC
+            LIMIT $1
+        `;
+
+        const result = await db.query(query, params);
+        res.json(result.rows);
+    } catch (error) {
+        console.error('[Schedule API] Error in invalid-dates endpoint:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Riding Data Date KPI endpoint
+app.get('/api/schedule/riding-data-date-kpi', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        const params = [];
+        let projectFilter = '';
+        
+        if (projectId && projectId !== 'all') {
+            projectFilter = 'WHERE projectid = $1';
+            params.push(projectId);
+        }
+
+        // Get Riding Data Date Count and Remaining Activities
+        const query = `
+            WITH metrics AS (
+                SELECT 
+                    COUNT(*) FILTER (WHERE ridingdatadate = 'Riding Data Date' AND activitystatus IN ('Active', 'NotStart')) as trdd_count,
+                    COUNT(*) FILTER (WHERE activitystatus != 'Complete') as remaining_activities
+                FROM activityanalysisview
+                ${projectFilter}
+            )
+            SELECT 
+                trdd_count as "TRDD_Count",
+                remaining_activities as "Remaining_Activities",
+                CASE 
+                    WHEN remaining_activities > 0 
+                    THEN CAST(ROUND(CAST((trdd_count::numeric / remaining_activities::numeric * 100) AS numeric), 1) AS numeric)
+                    ELSE 0 
+                END as "Riding_Data_Date_Percentage"
+            FROM metrics
+        `;
+
+        const result = await db.query(query, params);
+        
+        if (!result.rows[0]) {
+            throw new Error('No data returned from query');
+        }
+        
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('[Schedule API] Error in riding-data-date-kpi endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch Riding Data Date KPI data' });
+    }
+});
+
+// Riding Data Date Chart Data endpoint
+app.get('/api/schedule/riding-data-date-chart-data', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        const params = [];
+        let projectFilter = '';
+        
+        if (projectId && projectId !== 'all') {
+            projectFilter = 'AND projectid = $1';
+            params.push(projectId);
+        }
+
+        // Get donut chart data by activity type
+        const query = `
+            SELECT 
+                activitytype,
+                COUNT(*) as count
+            FROM activityanalysisview
+            WHERE ridingdatadate = 'Riding Data Date'
+            AND activitystatus IN ('Active', 'NotStart')
+            ${projectFilter}
+            GROUP BY activitytype
+            ORDER BY count DESC
+        `;
+
+        const result = await db.query(query, params);
+        res.json(result.rows);
+    } catch (error) {
+        console.error('[Schedule API] Error in riding-data-date-chart-data endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch Riding Data Date chart data' });
+    }
+});
+
+// Riding Data Date Percentage History endpoint
+app.get('/api/schedule/riding-data-date-percentage-history', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        // Calculate Riding Data Date percentage history using project table's last_recalc_date
+        let query = `
+            WITH ActivityMetrics AS (
+                SELECT 
+                    p.last_recalc_date::DATE as calc_date,
+                    COUNT(CASE WHEN a.ridingdatadate = 'Riding Data Date' AND a.activitystatus IN ('Active', 'NotStart') THEN 1 END) as trdd_count,
+                    COUNT(CASE WHEN a.activitystatus != 'Complete' THEN 1 END) as total_count
+                FROM activityanalysisview a
+                INNER JOIN project p ON a.projectid = p.proj_id
+                WHERE p.last_recalc_date IS NOT NULL
+        `;
+        
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND a.projectid = $1`;
+            params.push(projectId);
+        }
+        
+        query += `
+                GROUP BY p.last_recalc_date::DATE
+            )
+            SELECT 
+                TO_CHAR(calc_date, 'YYYY-MM') as date,
+                CASE 
+                    WHEN total_count > 0 THEN ROUND(CAST(trdd_count AS NUMERIC) * 100.0 / total_count, 1)
+                    ELSE 0 
+                END as percentage
+            FROM ActivityMetrics
+            ORDER BY calc_date ASC
+        `;
+
+        const result = await db.query(query, params);
+
+        const transformedData = result.rows.map(row => ({
+            date: row.date,
+            percentage: parseFloat(row.percentage) || 0
+        }));
+
+        res.json(transformedData);
+    } catch (error) {
+        console.error('[Schedule API] Error in riding-data-date-percentage-history endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch Riding Data Date history data' });
+    }
+});
+
+// Riding Data Date Table Data endpoint
+app.get('/api/schedule/riding-data-date', async (req, res) => {
+    try {
+        const limit = req.query.limit || 20;
+        const projectId = req.query.project_id;
+        const params = [limit];
+        let projectFilter = '';
+        
+        if (projectId && projectId !== 'all') {
+            projectFilter = 'AND projectid = $2';
+            params.push(projectId);
+        }
+
+        const query = `
+            SELECT
+                activityid as "Activity ID",
+                activityname as "Activity Name",
+                startdate as "Start Date",
+                finishdate as "Finish Date",
+                originalduration as "Original Duration",
+                totalfloatdays as "Total Float Days",
+                primaryconstraint as "Primary Constraint",
+                activitytype as "Activity Type",
+                activitystatus as "Activity Status",
+                ridingdatadate as "Riding Data Date"
+            FROM activityanalysisview
+            WHERE ridingdatadate = 'Riding Data Date'
+            AND activitystatus IN ('Active', 'NotStart')
+            ${projectFilter}
+            ORDER BY activityid ASC
+            LIMIT $1
+        `;
+
+        const result = await db.query(query, params);
+        res.json(result.rows);
+    } catch (error) {
+        console.error('[Schedule API] Error in riding-data-date endpoint:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Test database connection endpoint
+app.get('/api/test-db', async (req, res) => {
+    try {
+        const result = await db.healthCheck();
+        res.json({ success: true, data: result });
+    } catch (error) {
+        console.error('Database test failed:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Fallback route for SPA
 app.get('*', (req, res) => {
   // Don't serve index.html for API routes
   if (req.path.startsWith('/api/')) {
@@ -2860,4 +3931,181 @@ process.on('SIGINT', () => {
     console.error('[Server] Error closing database connection:', err.message);
     process.exit(1);
   });
+});
+
+// Resources KPI endpoint
+app.get('/api/schedule/resources-kpi', async (req, res) => {
+    try {
+        console.log('📊 Fetching resources KPI data...');
+        const projectId = req.query.project_id;
+        const params = [];
+        let projectFilter = '';
+        
+        if (projectId && projectId !== 'all') {
+            projectFilter = 'WHERE projectid = $1';
+            params.push(projectId);
+        }
+
+        // Get Resource Load Count and Remaining Activities
+        const query = `
+            WITH metrics AS (
+                SELECT 
+                    COUNT(resource) as resource_load_count,
+                    COUNT(*) FILTER (
+                        WHERE activitystatus != 'Complete'
+                    ) as remaining_activities
+                FROM activityanalysisview
+                ${projectFilter}
+            )
+            SELECT 
+                resource_load_count as "ResourceLoad_Count",
+                remaining_activities as "Remaining_Activities",
+                CASE 
+                    WHEN remaining_activities = 0 THEN 0 
+                    ELSE TRUNC((resource_load_count::numeric / remaining_activities::numeric) * 100, 1)
+                END as "Resource_Load_Percentage"
+            FROM metrics;`;
+
+        console.log('Executing query:', query);
+        const result = await db.query(query, params);
+        console.log('Query result:', result.rows[0]);
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('Error fetching resources KPI:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Resources chart data endpoint
+app.get('/api/schedule/resources-chart-data', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        const params = [];
+        let projectFilter = '';
+        
+        if (projectId && projectId !== 'all') {
+            projectFilter = 'WHERE projectid = $1';
+            params.push(projectId);
+        }
+
+        const query = `
+            SELECT 
+                resource,
+                COUNT(activityid) as activity_count,
+                totalfloatdays as float_days,
+                activitystatus as status
+            FROM activityanalysisview
+            WHERE resource IS NOT NULL 
+            AND totalfloatdays <= 15
+            AND activitystatus IN ('Active', 'NotStart')
+            ${projectFilter ? 'AND ' + projectFilter.substring(6) : ''}
+            GROUP BY resource, totalfloatdays, activitystatus
+            ORDER BY resource, totalfloatdays;`;
+
+        const result = await db.query(query, params);
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Error fetching resources chart data:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Resources percentage history endpoint
+app.get('/api/schedule/resources-percentage-history', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        const params = [];
+        let projectFilter = '';
+        
+        if (projectId && projectId !== 'all') {
+            projectFilter = 'AND p.projectid = $1';
+            params.push(projectId);
+        }
+
+        const query = `
+            WITH monthly_metrics AS (
+                SELECT 
+                    TO_CHAR(p.last_recalc_date, 'YYYY-MM') as monthyear,
+                    COUNT(*) FILTER (WHERE a.resource IS NOT NULL AND a.activitystatus IN ('Active', 'NotStart')) as resource_load_count,
+                    COUNT(*) FILTER (WHERE a.activitystatus != 'Complete' AND a.relationshipstatus = 'Incomplete') as remaining_activities
+                FROM project p
+                LEFT JOIN activityanalysisview a ON a.projectid = p.projectid
+                WHERE p.last_recalc_date IS NOT NULL ${projectFilter}
+                GROUP BY TO_CHAR(p.last_recalc_date, 'YYYY-MM')
+                ORDER BY monthyear
+            )
+            SELECT 
+                monthyear as date,
+                CASE 
+                    WHEN remaining_activities = 0 THEN 0
+                    ELSE ROUND((resource_load_count::decimal / remaining_activities) * 100, 1)
+                END as percentage
+            FROM monthly_metrics;`;
+
+        const result = await db.query(query, params);
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Error fetching resources percentage history:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Resources table data endpoint
+app.get('/api/schedule/resources', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        const limit = req.query.limit || 20;
+        const params = [limit];
+        let projectFilter = '';
+        
+        if (projectId && projectId !== 'all') {
+            projectFilter = 'AND projectid = $2';
+            params.push(projectId);
+        }
+
+        const query = `
+            SELECT 
+                activityid as "Activity ID",
+                activityname as "Activity Name",
+                startdate as "Start Date",
+                finishdate as "Finish Date",
+                originalduration as "Original Duration",
+                totalfloatdays as "Total Float Days",
+                primaryconstraint as "Primary Constraint",
+                activitytype as "Activity Type",
+                activitystatus as "Activity Status",
+                resource as "Resource"
+            FROM activityanalysisview
+            WHERE activitystatus IN ('Active', 'NotStart')
+            AND resource IS NOT NULL
+            ${projectFilter}
+            ORDER BY "Activity ID"
+            LIMIT $1;`;
+
+        const result = await db.query(query, params);
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Error fetching resources table data:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Test endpoint for activityanalysisview
+app.get('/api/schedule/test-view', async (req, res) => {
+    try {
+        console.log('Testing activityanalysisview query...');
+        const query = `
+            SELECT 
+                COUNT(*) as total_rows,
+                COUNT(resource) as resource_count,
+                COUNT(*) FILTER (WHERE activitystatus != 'Complete') as remaining_count
+            FROM activityanalysisview;`;
+
+        const result = await db.query(query);
+        console.log('Test query result:', result.rows[0]);
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('Error testing view:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
 });

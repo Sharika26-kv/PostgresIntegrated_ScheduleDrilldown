@@ -32,9 +32,42 @@ async function initializeApp() {
 }
 
 function setupEventListeners() {
-    // Metric card selection
+    // Initialize all metric cards with proper border styling
     document.querySelectorAll('.metric-card').forEach(card => {
+        // Set initial styles
+        card.style.border = '1px solid transparent';
+        card.style.transition = 'all 0.2s ease-in-out';
+        
+        // Add hover state
+        card.addEventListener('mouseenter', function() {
+            console.log('Hovering over metric:', this.dataset.metric);
+            const metric = this.dataset.metric;
+            const colorMap = {
+                'leads': '#3B82F6',      // blue-500
+                'lags': '#10B981',       // green-500
+                'excessive-lags': '#F97316', // orange-500
+                'fs': '#8B5CF6',         // purple-500
+                'non-fs': '#EF4444',     // red-500
+                'open-ends': '#14B8A6',  // teal-500
+                'constraints': '#6366F1', // indigo-500
+                'excessive-durations': '#9333EA'  // purple-600
+            };
+            
+            if (colorMap[metric]) {
+                this.style.border = `2px solid ${colorMap[metric]}`;
+            }
+        });
+
+        card.addEventListener('mouseleave', function() {
+            console.log('Mouse leaving metric:', this.dataset.metric);
+            if (this.dataset.metric !== currentMetric) {
+                this.style.border = '1px solid transparent';
+            }
+        });
+
+        // Click event
         card.addEventListener('click', function() {
+            console.log('Clicked metric:', this.dataset.metric);
             const metric = this.dataset.metric;
             selectMetric(metric);
         });
@@ -112,24 +145,31 @@ async function loadProjects() {
 }
 
 function selectMetric(metric) {
-    // Update UI state
+    console.log('Selecting metric:', metric);
+    
+    // Reset all cards
     document.querySelectorAll('.metric-card').forEach(card => {
-        card.classList.remove('border-blue-500', 'border-green-500', 'border-orange-500', 'border-purple-500', 'border-red-500', 'border-teal-500');
-        card.classList.add('border-transparent');
+        console.log('Resetting card:', card.dataset.metric);
+        card.style.border = '1px solid transparent';
     });
     
     const selectedCard = document.querySelector(`[data-metric="${metric}"]`);
     if (selectedCard) {
+        console.log('Found selected card for metric:', metric);
         const colorMap = {
-            'leads': 'border-blue-500',
-            'lags': 'border-green-500',
-            'excessive-lags': 'border-orange-500',
-            'fs': 'border-purple-500',
-            'non-fs': 'border-red-500',
-            'open-ends': 'border-teal-500',
-            'constraints': 'border-indigo-500'
+            'leads': '#3B82F6',      // blue-500
+            'lags': '#10B981',       // green-500
+            'excessive-lags': '#F97316', // orange-500
+            'fs': '#8B5CF6',         // purple-500
+            'non-fs': '#EF4444',     // red-500
+            'open-ends': '#14B8A6',  // teal-500
+            'constraints': '#6366F1', // indigo-500
+            'excessive-durations': '#9333EA'  // purple-600
         };
-        selectedCard.classList.add(colorMap[metric]);
+        
+        selectedCard.style.border = `2px solid ${colorMap[metric]}`;
+    } else {
+        console.warn('Selected card not found for metric:', metric);
     }
     
     // Show content area and hide initial message
@@ -218,7 +258,14 @@ function getKPIEndpoint(metric) {
         'fs': '/api/schedule/fs-kpi',
         'non-fs': '/api/schedule/non-fs-kpi',
         'open-ends': '/api/schedule/open-ends-kpi',
-        'constraints': '/api/schedule/constraints-kpi'
+        'constraints': '/api/schedule/constraints-kpi',
+        'excessive-durations': '/api/schedule/excessive-durations-kpi',
+        'negative-float': '/api/schedule/negative-float-kpi',
+        'critical-float': '/api/schedule/critical-float-kpi',
+        'excessive-float': '/api/schedule/excessive-float-kpi',
+        'invalid-dates': '/api/schedule/invalid-dates-kpi',
+        'riding-data-date': '/api/schedule/riding-data-date-kpi',
+        'resources': '/api/schedule/resources-kpi'
     };
     return endpoints[metric];
 }
@@ -231,7 +278,14 @@ function getChartEndpoint(metric) {
         'fs': '/api/schedule/fs-chart-data',
         'non-fs': '/api/schedule/non-fs-chart-data',
         'open-ends': '/api/schedule/open-ends-chart-data',
-        'constraints': '/api/schedule/constraints-chart-data'
+        'constraints': '/api/schedule/constraints-chart-data',
+        'excessive-durations': '/api/schedule/excessive-durations-chart-data',
+        'negative-float': '/api/schedule/negative-float-chart-data',
+        'critical-float': '/api/schedule/critical-float-chart-data',
+        'excessive-float': '/api/schedule/excessive-float-chart-data',
+        'invalid-dates': '/api/schedule/invalid-dates-chart-data',
+        'riding-data-date': '/api/schedule/riding-data-date-chart-data',
+        'resources': '/api/schedule/resources-chart-data'
     };
     return endpoints[metric];
 }
@@ -244,10 +298,16 @@ function getHistoryEndpoint(metric) {
         'fs': '/api/schedule/fs-percentage-history',
         'non-fs': '/api/schedule/non-fs-percentage-history',
         'open-ends': '/api/schedule/open-ends-percentage-history',
-        'constraints': '/api/schedule/constraints-percentage-history'
+        'constraints': '/api/schedule/constraints-percentage-history',
+        'excessive-durations': '/api/schedule/excessive-durations-percentage-history',
+        'negative-float': '/api/schedule/negative-float-percentage-history',
+        'critical-float': '/api/schedule/critical-float-percentage-history',
+        'excessive-float': '/api/schedule/excessive-float-percentage-history',
+        'invalid-dates': '/api/schedule/invalid-dates-percentage-history',
+        'riding-data-date': '/api/schedule/riding-data-date-percentage-history',
+        'resources': '/api/schedule/resources-percentage-history'
     };
-    
-    return endpoints[metric] || endpoints['leads'];
+    return endpoints[metric];
 }
 
 function getTableEndpoint(metric) {
@@ -258,7 +318,14 @@ function getTableEndpoint(metric) {
         'fs': '/api/schedule/fs',
         'non-fs': '/api/schedule/non-fs',
         'open-ends': '/api/schedule/open-ends',
-        'constraints': '/api/schedule/constraints'
+        'constraints': '/api/schedule/constraints',
+        'excessive-durations': '/api/schedule/excessive-durations',
+        'negative-float': '/api/schedule/negative-float',
+        'critical-float': '/api/schedule/critical-float',
+        'excessive-float': '/api/schedule/excessive-float',
+        'invalid-dates': '/api/schedule/invalid-dates',
+        'riding-data-date': '/api/schedule/riding-data-date',
+        'resources': '/api/schedule/resources'
     };
     return endpoints[metric];
 }
@@ -316,7 +383,49 @@ function getKPICards(data, metric) {
             return [
                 { title: 'Constraint Count', value: data.Constraint_Count || 0, color: 'indigo' },
                 { title: 'Remaining Activities', value: data.Remaining_Activities || 0, color: 'blue' },
-                { title: 'Constraints %', value: (data.Constraint_Percentage || 0).toFixed(2) + '%', color: 'purple' }
+                { title: 'Constraints %', value: (parseFloat(data.Constraint_Percentage || 0)).toFixed(2) + '%', color: 'purple' }
+            ];
+        case 'excessive-durations':
+            return [
+                { title: 'Excessive Duration Count', value: data.ED_Count || 0, color: 'purple' },
+                { title: 'Remaining Activities', value: data.Remaining_Activities || 0, color: 'blue' },
+                { title: 'Excessive Duration %', value: (parseFloat(data.Excessive_Duration_Percentage || 0)).toFixed(1) + '%', color: 'orange' }
+            ];
+        case 'negative-float':
+            return [
+                { title: 'Negative Total Float Count', value: data.NTF_Count || 0, color: 'blue' },
+                { title: 'Remaining Activities', value: data.Remaining_Activities || 0, color: 'red' },
+                { title: 'Negative Total Float %', value: (parseFloat(data.Negative_Float_Percentage || 0)).toFixed(1) + '%', color: 'orange' }
+            ];
+        case 'critical-float':
+            return [
+                { title: 'Critical Total Float Count', value: data.CTF_Count || 0, color: 'yellow' },
+                { title: 'Remaining Activities', value: data.Remaining_Activities || 0, color: 'red' },
+                { title: 'Critical Total Float %', value: (parseFloat(data.Critical_Float_Percentage || 0)).toFixed(1) + '%', color: 'orange' }
+            ];
+        case 'excessive-float':
+            return [
+                { title: 'Excessive Total Float Count', value: data.ETF_Count || 0, color: 'red' },
+                { title: 'Remaining Activities', value: data.Remaining_Activities || 0, color: 'blue' },
+                { title: 'Excessive Total Float %', value: (parseFloat(data.Excessive_Float_Percentage || 0)).toFixed(1) + '%', color: 'orange' }
+            ];
+        case 'invalid-dates':
+            return [
+                { title: 'Invalid Dates Count', value: data.IND_Count || 0, color: 'red' },
+                { title: 'Remaining Activities', value: data.Remaining_Activities || 0, color: 'blue' },
+                { title: 'Invalid Dates %', value: (parseFloat(data.Invalid_Dates_Percentage || 0)).toFixed(1) + '%', color: 'orange' }
+            ];
+        case 'riding-data-date':
+            return [
+                { title: 'Riding Data Date Count', value: data.TRDD_Count || 0, color: 'blue' },
+                { title: 'Remaining Activities', value: data.Remaining_Activities || 0, color: 'red' },
+                { title: 'Riding Data Date %', value: (parseFloat(data.Riding_Data_Date_Percentage || 0)).toFixed(1) + '%', color: 'orange' }
+            ];
+        case 'resources':
+            return [
+                { title: 'Resource Load Count', value: data.resourceload_count || 0, color: 'blue' },
+                { title: 'Remaining Activities', value: data.remaining_activities || 0, color: 'red' },
+                { title: 'Resource Load %', value: (parseFloat(data.resource_load_percentage || 0)).toFixed(1) + '%', color: 'orange' }
             ];
         default:
             return [];
@@ -354,7 +463,663 @@ function updateHistorySection(data, metric) {
 }
 
 function createChart(ctx, data, metric) {
-    // Special handling for leads, lags, and excessive-lags - stacked column chart
+    // Special handling for resources - scatter plot
+    if (metric === 'resources') {
+        const config = {
+            type: 'scatter',
+            data: {
+                datasets: []
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        type: 'linear',
+                        position: 'bottom',
+                        title: {
+                            display: true,
+                            text: 'Count of Resource',
+                            font: {
+                                size: 9
+                            }
+                        },
+                        ticks: {
+                            font: {
+                                size: 8
+                            }
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Total Float Days',
+                            font: {
+                                size: 9
+                            }
+                        },
+                        ticks: {
+                            font: {
+                                size: 8
+                            }
+                        },
+                        max: 15    // Set maximum to 15 as per requirement
+                        // Removed min: -15 to allow all negative values
+                    }
+                },
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        align: 'center',
+                        title: {
+                            display: true,
+                            text: 'Resource',
+                            font: {
+                                size: 9,
+                                weight: 'bold'
+                            }
+                        },
+                        labels: {
+                            font: {
+                                size: 8
+                            },
+                            padding: 4,
+                            usePointStyle: true,
+                            boxWidth: 6
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const point = context.raw;
+                                return `${point.resource}: ${point.count} activities, Float: ${point.y} days`;
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        // Process data for scatter plot
+        if (Array.isArray(data)) {
+            // Filter data for non-blank resources and total float days <= 15
+            const filteredData = data.filter(item => {
+                const floatDays = parseFloat(item.float_days);
+                return item.resource && item.resource.trim() !== '' && 
+                       !isNaN(floatDays) && floatDays <= 15; // Keep upper limit but allow all negative values
+            });
+
+            // Find minimum float days to adjust y-axis
+            let minFloatDays = 0;
+            filteredData.forEach(item => {
+                const floatDays = parseFloat(item.float_days);
+                if (floatDays < minFloatDays) {
+                    minFloatDays = floatDays;
+                }
+            });
+            
+            // Adjust y-axis minimum with some padding
+            config.options.scales.y.min = Math.floor(minFloatDays * 1.1);
+
+            // Group filtered data by resource
+            const groupedData = {};
+            filteredData.forEach(item => {
+                if (!groupedData[item.resource]) {
+                    groupedData[item.resource] = [];
+                }
+                groupedData[item.resource].push({
+                    x: parseInt(item.activity_count),
+                    y: parseFloat(item.float_days),
+                    count: parseInt(item.activity_count),
+                    resource: item.resource,
+                    status: item.status
+                });
+            });
+
+            // Create datasets for each resource
+            const colors = [
+                '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6',
+                '#06B6D4', '#84CC16', '#F97316', '#EC4899', '#6366F1'
+            ];
+
+            Object.entries(groupedData).forEach(([resource, points], index) => {
+                config.data.datasets.push({
+                    label: resource,
+                    data: points,
+                    backgroundColor: colors[index % colors.length],
+                    pointRadius: function(context) {
+                        const value = context.raw.count;
+                        return Math.sqrt(value) * 2;  // Scale point size based on count
+                    },
+                    pointHoverRadius: function(context) {
+                        const value = context.raw.count;
+                        return (Math.sqrt(value) * 2) + 2;
+                    }
+                });
+            });
+        }
+
+        return new Chart(ctx, config);
+    }
+
+    // Special handling for negative-float - scatter plot
+    if (metric === 'negative-float') {
+        const config = {
+            type: 'scatter',
+            data: {
+                datasets: []
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        type: 'linear',
+                        position: 'bottom',
+                        title: {
+                            display: true,
+                            text: 'Activity Count',
+                            font: {
+                                size: 9
+                            }
+                        },
+                        ticks: {
+                            font: {
+                                size: 8
+                            }
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Total Float Days',
+                            font: {
+                                size: 9
+                            }
+                        },
+                        ticks: {
+                            font: {
+                                size: 8
+                            }
+                        },
+                        max: 0,  // Set maximum to 0 since we only want negative values
+                        suggestedMin: -200  // Dynamically adjust based on data
+                    }
+                },
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        align: 'center',
+                        title: {
+                            display: true,
+                            text: 'Activity Status',
+                            font: {
+                                size: 9,
+                                weight: 'bold'
+                            }
+                        },
+                        labels: {
+                            font: {
+                                size: 8
+                            },
+                            padding: 4,
+                            usePointStyle: true,
+                            boxWidth: 6
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const point = context.raw;
+                                return `${point.status}: ${point.count} activities, Float: ${point.y} days`;
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        // Process data for scatter plot
+        if (Array.isArray(data)) {
+            const statusColors = {
+                'Active': '#3B82F6',  // blue-500
+                'NotStart': '#10B981'  // green-500
+            };
+
+            // Find minimum float days to set scale
+            let minFloatDays = 0;
+            data.forEach(item => {
+                const floatDays = parseFloat(item.float_days);
+                if (floatDays < minFloatDays) {
+                    minFloatDays = floatDays;
+                }
+            });
+            
+            // Adjust y-axis minimum with some padding
+            config.options.scales.y.suggestedMin = Math.floor(minFloatDays * 1.1);
+
+            // Group data by status
+            const groupedData = {};
+            data.forEach(item => {
+                if (!groupedData[item.status]) {
+                    groupedData[item.status] = [];
+                }
+                groupedData[item.status].push({
+                    x: parseInt(item.activity_count),
+                    y: parseFloat(item.float_days),
+                    count: parseInt(item.activity_count),
+                    status: item.status
+                });
+            });
+
+            // Create datasets
+            Object.entries(groupedData).forEach(([status, points]) => {
+                config.data.datasets.push({
+                    label: status,
+                    data: points,
+                    backgroundColor: statusColors[status] || '#6B7280',
+                    pointRadius: function(context) {
+                        const value = context.raw.count;
+                        return Math.sqrt(value) * 2;  // Scale point size based on count
+                    },
+                    pointHoverRadius: function(context) {
+                        const value = context.raw.count;
+                        return (Math.sqrt(value) * 2) + 2;
+                    }
+                });
+            });
+        }
+
+        return new Chart(ctx, config);
+    }
+
+    // Special handling for invalid-dates and riding-data-date - donut chart
+    if (metric === 'invalid-dates' || metric === 'riding-data-date') {
+        const config = {
+            type: 'doughnut',
+            data: {
+                labels: [],
+                datasets: [{
+                    data: [],
+                    backgroundColor: metric === 'invalid-dates' ? [
+                        '#EF4444', // red-500
+                        '#F87171', // red-400
+                        '#FCA5A5', // red-300
+                        '#FEE2E2'  // red-100
+                    ] : [
+                        '#3B82F6', // blue-500
+                        '#60A5FA', // blue-400
+                        '#93C5FD', // blue-300
+                        '#BFDBFE'  // blue-100
+                    ],
+                    borderColor: '#ffffff',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        align: 'center',
+                        title: {
+                            display: true,
+                            text: 'Activity Type',
+                            font: {
+                                size: 9,
+                                weight: 'bold'
+                            }
+                        },
+                        labels: {
+                            font: {
+                                size: 8
+                            },
+                            padding: 4,
+                            usePointStyle: true,
+                            boxWidth: 6
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return `${context.label}: ${context.raw} activities`;
+                            }
+                        }
+                    }
+                },
+                cutout: '60%'
+            }
+        };
+
+        // Process data for donut chart
+        if (Array.isArray(data) && data.length > 0) {
+            config.data.labels = data.map(item => item.activitytype);
+            config.data.datasets[0].data = data.map(item => parseInt(item.count));
+        }
+
+        return new Chart(ctx, config);
+    }
+
+    // Special handling for excessive-durations - donut chart
+    if (metric === 'excessive-durations') {
+        const config = {
+            type: 'doughnut',
+            data: {
+                labels: [],
+                datasets: [{
+                    data: [],
+                    backgroundColor: [
+                        '#9333EA', // purple-600 for Active
+                        '#C084FC'  // purple-400 for NotStart
+                    ],
+                    borderColor: '#ffffff',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        align: 'center',
+                        title: {
+                            display: true,
+                            text: 'Activity Status',
+                            font: {
+                                size: 9,
+                                weight: 'bold'
+                            }
+                        },
+                        labels: {
+                            font: {
+                                size: 8
+                            },
+                            padding: 4,
+                            usePointStyle: true,
+                            boxWidth: 6
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return `${context.label}: ${context.raw} activities`;
+                            }
+                        }
+                    }
+                },
+                cutout: '60%'
+            }
+        };
+
+        // Process data for excessive durations donut chart
+        if (Array.isArray(data) && data.length > 0) {
+            // Filter only Excessive Duration data
+            const excessiveDurationData = data.filter(item => item.duration_category === 'Excessive Duration');
+            config.data.labels = excessiveDurationData.map(item => item.status);
+            config.data.datasets[0].data = excessiveDurationData.map(item => parseInt(item.count));
+        }
+
+        return new Chart(ctx, config);
+    }
+
+    // Special handling for excessive-float - scatter plot
+    if (metric === 'excessive-float') {
+        const config = {
+            type: 'scatter',
+            data: {
+                datasets: []
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        type: 'linear',
+                        position: 'bottom',
+                        title: {
+                            display: true,
+                            text: 'Activity Count',
+                            font: {
+                                size: 9
+                            }
+                        },
+                        ticks: {
+                            font: {
+                                size: 8
+                            }
+                        },
+                        min: 0,
+                        suggestedMax: null  // Will be set dynamically based on data
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Total Float Days',
+                            font: {
+                                size: 9
+                            }
+                        },
+                        ticks: {
+                            font: {
+                                size: 8
+                            }
+                        },
+                        min: 40,  // Set minimum to 40 since we only want values >= 40
+                        suggestedMax: null  // Will be set dynamically based on data
+                    }
+                },
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        align: 'center',
+                        title: {
+                            display: true,
+                            text: 'Activity Status',
+                            font: {
+                                size: 9,
+                                weight: 'bold'
+                            }
+                        },
+                        labels: {
+                            font: {
+                                size: 8
+                            },
+                            padding: 4,
+                            usePointStyle: true,
+                            boxWidth: 6
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const point = context.raw;
+                                return `${point.status}: ${point.count} activities, Float: ${point.y} days`;
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        // Process data for scatter plot
+        if (Array.isArray(data)) {
+            const statusColors = {
+                'Active': '#3B82F6',  // blue-500
+                'NotStart': '#10B981'  // green-500
+            };
+
+            // Find maximum values for axes
+            let maxCount = 0;
+            let maxFloatDays = 40;
+            data.forEach(item => {
+                const count = parseInt(item.activity_count);
+                const floatDays = parseFloat(item.float_days);
+                if (count > maxCount) maxCount = count;
+                if (floatDays > maxFloatDays) maxFloatDays = floatDays;
+            });
+            
+            // Adjust axes ranges with padding
+            config.options.scales.x.suggestedMax = Math.ceil(maxCount * 1.1);
+            config.options.scales.y.suggestedMax = Math.ceil(maxFloatDays * 1.1);
+
+            // Group data by status
+            const groupedData = {};
+            data.forEach(item => {
+                if (!groupedData[item.status]) {
+                    groupedData[item.status] = [];
+                }
+                groupedData[item.status].push({
+                    x: parseInt(item.activity_count),
+                    y: parseFloat(item.float_days),
+                    count: parseInt(item.activity_count),
+                    status: item.status,
+                    total: parseInt(item.total_by_status)
+                });
+            });
+
+            // Create datasets
+            Object.entries(groupedData).forEach(([status, points]) => {
+                config.data.datasets.push({
+                    label: status,
+                    data: points,
+                    backgroundColor: statusColors[status] || '#6B7280',
+                    pointRadius: function(context) {
+                        const value = context.raw.count;
+                        return Math.sqrt(value) * 3;  // Increased size multiplier for better visibility
+                    },
+                    pointHoverRadius: function(context) {
+                        const value = context.raw.count;
+                        return (Math.sqrt(value) * 3) + 2;
+                    }
+                });
+            });
+        }
+
+        return new Chart(ctx, config);
+    }
+
+    // Special handling for critical-float - scatter plot
+    if (metric === 'critical-float') {
+        const config = {
+            type: 'scatter',
+            data: {
+                datasets: []
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        type: 'linear',
+                        position: 'bottom',
+                        title: {
+                            display: true,
+                            text: 'Activity Count',
+                            font: {
+                                size: 9
+                            }
+                        },
+                        ticks: {
+                            font: {
+                                size: 8
+                            }
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Total Float Days',
+                            font: {
+                                size: 9
+                            }
+                        },
+                        ticks: {
+                            font: {
+                                size: 8
+                            }
+                        },
+                        min: 0,  // Set minimum to 0
+                        max: 15  // Set maximum to 15
+                    }
+                },
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        align: 'center',
+                        title: {
+                            display: true,
+                            text: 'Activity Status',
+                            font: {
+                                size: 9,
+                                weight: 'bold'
+                            }
+                        },
+                        labels: {
+                            font: {
+                                size: 8
+                            },
+                            padding: 4,
+                            usePointStyle: true,
+                            boxWidth: 6
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const point = context.raw;
+                                return `${point.status}: ${point.count} activities, Float: ${point.y} days`;
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        // Process data for scatter plot
+        if (Array.isArray(data)) {
+            const statusColors = {
+                'Active': '#3B82F6',  // blue-500
+                'NotStart': '#10B981'  // green-500
+            };
+
+            // Group data by status
+            const groupedData = {};
+            data.forEach(item => {
+                if (!groupedData[item.status]) {
+                    groupedData[item.status] = [];
+                }
+                groupedData[item.status].push({
+                    x: parseInt(item.activity_count),
+                    y: parseFloat(item.float_days),
+                    count: parseInt(item.activity_count),
+                    status: item.status
+                });
+            });
+
+            // Create datasets
+            Object.entries(groupedData).forEach(([status, points]) => {
+                config.data.datasets.push({
+                    label: status,
+                    data: points,
+                    backgroundColor: statusColors[status] || '#6B7280',
+                    pointRadius: function(context) {
+                        const value = context.raw.count;
+                        return Math.sqrt(value) * 2;  // Scale point size based on count
+                    },
+                    pointHoverRadius: function(context) {
+                        const value = context.raw.count;
+                        return (Math.sqrt(value) * 2) + 2;
+                    }
+                });
+            });
+        }
+
+        return new Chart(ctx, config);
+    }
+
+    // Special handling for leads, lags, excessive-lags - stacked column chart
     if (metric === 'leads' || metric === 'lags' || metric === 'excessive-lags') {
         return createStackedColumnChart(ctx, data, metric);
     }
@@ -378,10 +1143,14 @@ function createChart(ctx, data, metric) {
             plugins: {
                 legend: {
                     position: 'bottom',
+                    align: 'center',
                     labels: {
-                        fontSize: 9,
-                        padding: 6,
-                        usePointStyle: true
+                        font: {
+                            size: 8
+                        },
+                        padding: 4,
+                        usePointStyle: true,
+                        boxWidth: 6
                     }
                 }
             },
@@ -391,8 +1160,14 @@ function createChart(ctx, data, metric) {
     
     // Process data based on metric type
     if (Array.isArray(data) && data.length > 0) {
-        config.data.labels = data.map(item => item.details || 'Unknown');
-        config.data.datasets[0].data = data.map(item => item.value || 0);
+        if (metric === 'open-ends') {
+            // For open-ends, we want to show the details as labels and values as data
+            config.data.labels = data.map(item => item.details || 'Unknown');
+            config.data.datasets[0].data = data.map(item => parseInt(item.value) || 0);
+        } else {
+            config.data.labels = data.map(item => item.details || 'Unknown');
+            config.data.datasets[0].data = data.map(item => item.value || 0);
+        }
     } else if (data && typeof data === 'object') {
         // Handle object-based data
         const entries = Object.entries(data);
@@ -414,6 +1189,8 @@ function createStackedColumnChart(ctx, data, metric) {
         xAxisLabel = 'Lags';
     } else if (metric === 'excessive-lags') {
         xAxisLabel = 'Excessive Lags';
+    } else if (metric === 'excessive-durations') {
+        xAxisLabel = 'Excessive Durations';
     }
     
     const config = {
@@ -460,11 +1237,15 @@ function createStackedColumnChart(ctx, data, metric) {
             },
             plugins: {
                 legend: {
-                    position: 'top',
+                    position: 'bottom',
+                    align: 'center',
                     labels: {
-                        fontSize: 9,
-                        padding: 6,
-                        usePointStyle: true
+                        font: {
+                            size: 8
+                        },
+                        padding: 4,
+                        usePointStyle: true,
+                        boxWidth: 6
                     }
                 }
             }
@@ -526,10 +1307,16 @@ function createHistoryChart(ctx, data, metric) {
         data: {
             labels: [],
             datasets: [{
-                label: `${metric.charAt(0).toUpperCase() + metric.slice(1)} Trend`,
+                label: metric === 'excessive-durations' ? 'Excessive Duration %' : 
+                       metric === 'invalid-dates' ? 'Invalid Dates %' :
+                       `${metric.charAt(0).toUpperCase() + metric.slice(1)} Trend`,
                 data: [],
-                borderColor: '#3B82F6',
-                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                borderColor: metric === 'excessive-durations' ? '#9333EA' : 
+                           metric === 'invalid-dates' ? '#EF4444' : 
+                           '#3B82F6',
+                backgroundColor: metric === 'excessive-durations' ? 'rgba(147, 51, 234, 0.1)' : 
+                               metric === 'invalid-dates' ? 'rgba(239, 68, 68, 0.1)' :
+                               'rgba(59, 130, 246, 0.1)',
                 tension: 0.4,
                 pointRadius: 4,
                 pointHoverRadius: 6
@@ -544,6 +1331,9 @@ function createHistoryChart(ctx, data, metric) {
                     ticks: {
                         font: {
                             size: 8
+                        },
+                        callback: function(value) {
+                            return value + '%';
                         }
                     }
                 },
@@ -563,6 +1353,13 @@ function createHistoryChart(ctx, data, metric) {
                         fontSize: 9,
                         padding: 6,
                         usePointStyle: true
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `${context.dataset.label}: ${context.parsed.y}%`;
+                        }
                     }
                 }
             }
@@ -738,6 +1535,98 @@ function getTableConfig(metric) {
                 { field: 'Activity Type', title: 'Activity Type' },
                 { field: 'Activity Status', title: 'Activity Status' },
                 { field: 'Open End', title: 'Open End' }
+            ]
+        },
+        'excessive-durations': {
+            columns: [
+                { field: 'Activity ID', title: 'Activity ID' },
+                { field: 'Activity Name', title: 'Activity Name' },
+                { field: 'Start Date', title: 'Start Date' },
+                { field: 'Finish Date', title: 'Finish Date' },
+                { field: 'Original Duration', title: 'Original Duration' },
+                { field: 'Total Float Days', title: 'Total Float Days' },
+                { field: 'Primary Constraint', title: 'Primary Constraint' },
+                { field: 'Activity Type', title: 'Activity Type' },
+                { field: 'Activity Status', title: 'Activity Status' }
+            ]
+        },
+        'negative-float': {
+            columns: [
+                { field: 'Activity ID', title: 'Activity ID' },
+                { field: 'Activity Name', title: 'Activity Name' },
+                { field: 'Start Date', title: 'Start Date' },
+                { field: 'Finish Date', title: 'Finish Date' },
+                { field: 'Original Duration', title: 'Original Duration' },
+                { field: 'Total Float Days', title: 'Total Float Days' },
+                { field: 'Primary Constraint', title: 'Primary Constraint' },
+                { field: 'Activity Type', title: 'Activity Type' },
+                { field: 'Activity Status', title: 'Activity Status' }
+            ]
+        },
+        'critical-float': {
+            columns: [
+                { field: 'Activity ID', title: 'Activity ID' },
+                { field: 'Activity Name', title: 'Activity Name' },
+                { field: 'Start Date', title: 'Start Date' },
+                { field: 'Finish Date', title: 'Finish Date' },
+                { field: 'Original Duration', title: 'Original Duration' },
+                { field: 'Total Float Days', title: 'Total Float Days' },
+                { field: 'Primary Constraint', title: 'Primary Constraint' },
+                { field: 'Activity Type', title: 'Activity Type' },
+                { field: 'Activity Status', title: 'Activity Status' }
+            ]
+        },
+        'excessive-float': {
+            columns: [
+                { field: 'Activity ID', title: 'Activity ID' },
+                { field: 'Activity Name', title: 'Activity Name' },
+                { field: 'Start Date', title: 'Start Date' },
+                { field: 'Finish Date', title: 'Finish Date' },
+                { field: 'Original Duration', title: 'Original Duration' },
+                { field: 'Total Float Days', title: 'Total Float Days' },
+                { field: 'Primary Constraint', title: 'Primary Constraint' },
+                { field: 'Activity Type', title: 'Activity Type' },
+                { field: 'Activity Status', title: 'Activity Status' }
+            ]
+        },
+        'invalid-dates': {
+            columns: [
+                { field: 'Activity ID', title: 'Activity ID' },
+                { field: 'Activity Name', title: 'Activity Name' },
+                { field: 'Start Date', title: 'Start Date' },
+                { field: 'Finish Date', title: 'Finish Date' },
+                { field: 'Invalid Start', title: 'Invalid Start' },
+                { field: 'Invalid Finish', title: 'Invalid Finish' },
+                { field: 'Activity Type', title: 'Activity Type' },
+                { field: 'Activity Status', title: 'Activity Status' }
+            ]
+        },
+        'riding-data-date': {
+            columns: [
+                { field: 'Activity ID', title: 'Activity ID' },
+                { field: 'Activity Name', title: 'Activity Name' },
+                { field: 'Start Date', title: 'Start Date' },
+                { field: 'Finish Date', title: 'Finish Date' },
+                { field: 'Original Duration', title: 'Original Duration' },
+                { field: 'Total Float Days', title: 'Total Float Days' },
+                { field: 'Primary Constraint', title: 'Primary Constraint' },
+                { field: 'Activity Type', title: 'Activity Type' },
+                { field: 'Activity Status', title: 'Activity Status' },
+                { field: 'Riding Data Date', title: 'Riding Data Date' }
+            ]
+        },
+        'resources': {
+            columns: [
+                { field: 'Activity ID', title: 'Activity ID' },
+                { field: 'Activity Name', title: 'Activity Name' },
+                { field: 'Start Date', title: 'Start Date' },
+                { field: 'Finish Date', title: 'Finish Date' },
+                { field: 'Original Duration', title: 'Original Duration' },
+                { field: 'Total Float Days', title: 'Total Float Days' },
+                { field: 'Primary Constraint', title: 'Primary Constraint' },
+                { field: 'Activity Type', title: 'Activity Type' },
+                { field: 'Activity Status', title: 'Activity Status' },
+                { field: 'Resource', title: 'Resource' }
             ]
         }
     };
