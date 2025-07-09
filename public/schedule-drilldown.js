@@ -45,17 +45,30 @@ function setupEventListeners() {
         card.style.flexBasis = '0';  // Equal base size for all cards
         card.style.height = 'auto';  // Let height adjust to content
         
-        // Force black text color for all metric text
-        const metricTexts = card.querySelectorAll('*');
-        metricTexts.forEach(element => {
-            element.style.color = '#000000';
-        });
-        
         // Add hover state
         card.addEventListener('mouseenter', function() {
             console.log('Hovering over metric:', this.dataset.metric);
             const metric = this.dataset.metric;
-            this.style.border = '1px solid #000000';  // Black border on hover
+            const colorMap = {
+                'leads': '#3B82F6',      // blue-500
+                'lags': '#10B981',       // green-500
+                'excessive-lags': '#F97316', // orange-500
+                'fs': '#8B5CF6',         // purple-500
+                'non-fs': '#EF4444',     // red-500
+                'open-ends': '#14B8A6',  // teal-500
+                'constraints': '#6366F1', // indigo-500
+                'excessive-durations': '#9333EA',  // purple-600
+                'negative-float': '#2563EB',  // blue-600
+                'critical-float': '#FBBF24',  // amber-400
+                'excessive-float': '#DC2626',  // red-600
+                'invalid-dates': '#EF4444',  // red-500
+                'riding-data-date': '#3B82F6',  // blue-500
+                'resources': '#000000'  // black
+            };
+            
+            if (colorMap[metric]) {
+                this.style.border = `1px solid ${colorMap[metric]}`; // Thinner border on hover
+            }
         });
 
         card.addEventListener('mouseleave', function() {
@@ -472,24 +485,22 @@ function createKPICard(card) {
     div.style.margin = '0';
     div.style.minWidth = '0';
     
-    // Special handling for resources metric to use black text
-    const titleColorClass = currentMetric === 'resources' ? 'text-black' : 'text-gray-500';
-    const valueColorClass = currentMetric === 'resources' ? 'text-black' : `text-${card.color}-600`;
-    
+    // Always use black text for KPI cards
     const container = document.createElement('div');
     container.className = 'text-center';
     container.style.lineHeight = '1.2';  // Slightly more spacing
     
     const title = document.createElement('h3');
-    title.className = `${titleColorClass}`;
     title.style.fontSize = '9px';  // Increased from 8px
     title.style.marginBottom = '3px';  // Increased spacing
+    title.style.color = '#000000';  // Force black text
     title.textContent = card.title;
     
     const value = document.createElement('p');
-    value.className = `font-medium ${valueColorClass}`;
     value.style.fontSize = '10px';  // Increased from 9px
     value.style.marginTop = '3px';  // Increased spacing
+    value.style.fontWeight = '500';  // Medium weight for better readability
+    value.style.color = '#000000';  // Force black text
     value.textContent = card.value;
     
     container.appendChild(title);
