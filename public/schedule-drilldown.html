@@ -148,81 +148,100 @@
             
             <!-- Dashboard Content -->
             <main class="p-2">
-                                  <!-- Metric Selection Cards -->
-                <div class="grid grid-cols-1 md:grid-cols-7 gap-2 mb-2">
+                <style>
+                    .metrics-grid {
+                        display: grid;
+                        grid-template-columns: repeat(7, 1fr);
+                        gap: 10px;
+                        margin-bottom: 10px;
+                    }
+                    .metric-card {
+                        height: 48px;
+                        padding: 0 8px;
+                        display: flex;
+                        align-items: center;
+                    }
+                    @media (max-width: 768px) {
+                        .metrics-grid {
+                            grid-template-columns: 1fr;
+                        }
+                    }
+                </style>
+                <!-- Metric Selection Cards -->
+                <div class="metrics-grid">
                     <!-- Top Row -->
-                    <div class="metric-card bg-white rounded-lg shadow-lg p-2 cursor-pointer border-2 border-transparent hover:border-purple-500 transition-all duration-200" data-metric="fs">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <h3 class="text-xs font-medium text-gray-800">Typical Relationships FS+0d Lag</h3>
+                    <div class="metric-card bg-white rounded-lg shadow-lg cursor-pointer border-2 border-transparent hover:border-purple-500 transition-all duration-200" data-metric="fs">
+                        <div class="flex items-center justify-between w-full">
+                            <div class="flex-grow min-w-0">
+                                <h3 class="text-xs font-medium text-gray-800 leading-none">Typical Relationships FS+0d Lag</h3>
                             </div>
-                            <div class="bg-purple-100 p-1 rounded-full">
+                            <div class="bg-purple-100 p-1.5 rounded-full flex-shrink-0 ml-2">
                                 <i class="fas fa-link text-purple-600 text-sm"></i>
                             </div>
                         </div>
                     </div>
                     
-                    <div class="metric-card bg-white rounded-lg shadow-lg p-2 cursor-pointer border-2 border-transparent hover:border-red-500 transition-all duration-200" data-metric="non-fs">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <h3 class="text-xs font-medium text-gray-800">Typical Relationships Non FS+0d Lag</h3>
+                    <div class="metric-card bg-white rounded-lg shadow-lg cursor-pointer border-2 border-transparent hover:border-red-500 transition-all duration-200" data-metric="non-fs">
+                        <div class="flex items-center justify-between w-full">
+                            <div class="flex-grow min-w-0">
+                                <h3 class="text-xs font-medium text-gray-800 leading-none">Typical Relationships Non FS+0d Lag</h3>
                             </div>
-                            <div class="bg-red-100 p-1 rounded-full">
+                            <div class="bg-red-100 p-1.5 rounded-full flex-shrink-0 ml-2">
                                 <i class="fas fa-random text-red-600 text-sm"></i>
                             </div>
                         </div>
                     </div>
                     
-                    <div class="metric-card bg-white rounded-lg shadow-lg p-2 cursor-pointer border-2 border-transparent hover:border-teal-500 transition-all duration-200" data-metric="open-ends">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <h3 class="text-xs font-medium text-gray-800">Open Ends</h3>
+                    <div class="metric-card bg-white rounded-lg shadow-lg cursor-pointer border-2 border-transparent hover:border-teal-500 transition-all duration-200" data-metric="open-ends">
+                        <div class="flex items-center justify-between w-full">
+                            <div class="flex-grow min-w-0">
+                                <h3 class="text-xs font-medium text-gray-800 truncate">Open Ends</h3>
                             </div>
-                            <div class="bg-teal-100 p-1 rounded-full">
+                            <div class="bg-teal-100 p-1.5 rounded-full flex-shrink-0 ml-3">
                                 <i class="fas fa-unlink text-teal-600 text-sm"></i>
                             </div>
                         </div>
                     </div>
                     
-                    <div class="metric-card bg-white rounded-lg shadow-lg p-2 cursor-pointer border-2 border-transparent hover:border-blue-500 transition-all duration-200" data-metric="leads">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <h3 class="text-xs font-medium text-gray-800">Leads</h3>
+                    <div class="metric-card bg-white rounded-lg shadow-lg cursor-pointer border-2 border-transparent hover:border-blue-500 transition-all duration-200" data-metric="leads">
+                        <div class="flex items-center justify-between w-full">
+                            <div class="flex-grow min-w-0">
+                                <h3 class="text-xs font-medium text-gray-800 truncate">Leads</h3>
                             </div>
-                            <div class="bg-blue-100 p-1 rounded-full">
+                            <div class="bg-blue-100 p-1.5 rounded-full flex-shrink-0 ml-3">
                                 <i class="fas fa-arrow-right text-blue-600 text-sm"></i>
                             </div>
                         </div>
                     </div>
                     
-                    <div class="metric-card bg-white rounded-lg shadow-lg p-2 cursor-pointer border-2 border-transparent hover:border-green-500 transition-all duration-200" data-metric="lags">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <h3 class="text-xs font-medium text-gray-800">Lags</h3>
+                    <div class="metric-card bg-white rounded-lg shadow-lg cursor-pointer border-2 border-transparent hover:border-green-500 transition-all duration-200" data-metric="lags">
+                        <div class="flex items-center justify-between w-full">
+                            <div class="flex-grow min-w-0">
+                                <h3 class="text-xs font-medium text-gray-800 truncate">Lags</h3>
                             </div>
-                            <div class="bg-green-100 p-1 rounded-full">
+                            <div class="bg-green-100 p-1.5 rounded-full flex-shrink-0 ml-3">
                                 <i class="fas fa-clock text-green-600 text-sm"></i>
                             </div>
                         </div>
                     </div>
                     
-                    <div class="metric-card bg-white rounded-lg shadow-lg p-2 cursor-pointer border-2 border-transparent hover:border-orange-500 transition-all duration-200" data-metric="excessive-lags">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <h3 class="text-xs font-medium text-gray-800">Excessive Lags</h3>
+                    <div class="metric-card bg-white rounded-lg shadow-lg cursor-pointer border-2 border-transparent hover:border-orange-500 transition-all duration-200" data-metric="excessive-lags">
+                        <div class="flex items-center justify-between w-full">
+                            <div class="flex-grow min-w-0">
+                                <h3 class="text-xs font-medium text-gray-800 truncate">Excessive Lags</h3>
                             </div>
-                            <div class="bg-orange-100 p-1 rounded-full">
+                            <div class="bg-orange-100 p-1.5 rounded-full flex-shrink-0 ml-3">
                                 <i class="fas fa-exclamation-triangle text-orange-600 text-sm"></i>
                             </div>
                         </div>
                     </div>
                     
-                    <div class="metric-card bg-white rounded-lg shadow-lg p-2 cursor-pointer border-2 border-transparent hover:border-indigo-500 transition-all duration-200" data-metric="constraints">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <h3 class="text-xs font-medium text-gray-800">Constraints</h3>
+                    <div class="metric-card bg-white rounded-lg shadow-lg cursor-pointer border-2 border-transparent hover:border-indigo-500 transition-all duration-200" data-metric="constraints">
+                        <div class="flex items-center justify-between w-full">
+                            <div class="flex-grow min-w-0">
+                                <h3 class="text-xs font-medium text-gray-800 truncate">Constraints</h3>
                             </div>
-                            <div class="bg-indigo-100 p-1 rounded-full">
+                            <div class="bg-indigo-100 p-1.5 rounded-full flex-shrink-0 ml-3">
                                 <i class="fas fa-lock text-indigo-600 text-sm"></i>
                             </div>
                         </div>
@@ -230,86 +249,86 @@
                 </div>
 
                 <!-- Bottom Row -->
-                <div class="grid grid-cols-1 md:grid-cols-7 gap-2">
+                <div class="metrics-grid mb-0">
                     <!-- Excessive Durations -->
-                    <div class="metric-card bg-white rounded-lg shadow-lg p-2 cursor-pointer border-2 border-transparent hover:border-purple-500 transition-all duration-200" data-metric="excessive-durations">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <h3 class="text-xs font-medium text-gray-800">Excessive Durations</h3>
+                    <div class="metric-card bg-white rounded-lg shadow-lg cursor-pointer border-2 border-transparent hover:border-purple-500 transition-all duration-200" data-metric="excessive-durations">
+                        <div class="flex items-center justify-between w-full">
+                            <div class="flex-grow min-w-0">
+                                <h3 class="text-xs font-medium text-gray-800 truncate">Excessive Durations</h3>
                             </div>
-                            <div class="bg-purple-100 p-1 rounded-full">
+                            <div class="bg-purple-100 p-1.5 rounded-full flex-shrink-0 ml-3">
                                 <i class="fas fa-clock text-purple-600 text-sm"></i>
                             </div>
                         </div>
                     </div>
 
                     <!-- Negative Total Float -->
-                    <div class="metric-card bg-white rounded-lg shadow-lg p-2 cursor-pointer border-2 border-transparent hover:border-blue-500 transition-all duration-200" data-metric="negative-float">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <h3 class="text-xs font-medium text-gray-800">Negative Total Float</h3>
+                    <div class="metric-card bg-white rounded-lg shadow-lg cursor-pointer border-2 border-transparent hover:border-blue-500 transition-all duration-200" data-metric="negative-float">
+                        <div class="flex items-center justify-between w-full">
+                            <div class="flex-grow min-w-0">
+                                <h3 class="text-xs font-medium text-gray-800 truncate">Negative Total Float</h3>
                             </div>
-                            <div class="bg-blue-100 p-1 rounded-full">
+                            <div class="bg-blue-100 p-1.5 rounded-full flex-shrink-0 ml-3">
                                 <i class="fas fa-arrow-down text-blue-600 text-sm"></i>
                             </div>
                         </div>
                     </div>
 
                     <!-- Critical Total Float -->
-                    <div class="metric-card bg-white rounded-lg shadow-lg p-2 cursor-pointer border-2 border-transparent hover:border-yellow-500 transition-all duration-200" data-metric="critical-float">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <h3 class="text-xs font-medium text-gray-800">Critical Total Float</h3>
+                    <div class="metric-card bg-white rounded-lg shadow-lg cursor-pointer border-2 border-transparent hover:border-yellow-500 transition-all duration-200" data-metric="critical-float">
+                        <div class="flex items-center justify-between w-full">
+                            <div class="flex-grow min-w-0">
+                                <h3 class="text-xs font-medium text-gray-800 truncate">Critical Total Float</h3>
                             </div>
-                            <div class="bg-yellow-100 p-1 rounded-full">
+                            <div class="bg-yellow-100 p-1.5 rounded-full flex-shrink-0 ml-3">
                                 <i class="fas fa-exclamation text-yellow-600 text-sm"></i>
                             </div>
                         </div>
                     </div>
 
                     <!-- Excessive Total Float -->
-                    <div class="metric-card bg-white rounded-lg shadow-lg p-2 cursor-pointer border-2 border-transparent hover:border-red-500 transition-all duration-200" data-metric="excessive-float">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <h3 class="text-xs font-medium text-gray-800">Excessive Total Float</h3>
+                    <div class="metric-card bg-white rounded-lg shadow-lg cursor-pointer border-2 border-transparent hover:border-red-500 transition-all duration-200" data-metric="excessive-float">
+                        <div class="flex items-center justify-between w-full">
+                            <div class="flex-grow min-w-0">
+                                <h3 class="text-xs font-medium text-gray-800 truncate">Excessive Total Float</h3>
                             </div>
-                            <div class="bg-red-100 p-1 rounded-full">
+                            <div class="bg-red-100 p-1.5 rounded-full flex-shrink-0 ml-3">
                                 <i class="fas fa-arrow-up text-red-600 text-sm"></i>
                             </div>
                         </div>
                     </div>
 
                     <!-- Riding Data Date -->
-                    <div class="metric-card bg-white rounded-lg shadow-lg p-2 cursor-pointer border-2 border-transparent hover:border-blue-500 transition-all duration-200" data-metric="riding-data-date">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <h3 class="text-xs font-medium text-gray-800">Riding Data Date</h3>
+                    <div class="metric-card bg-white rounded-lg shadow-lg cursor-pointer border-2 border-transparent hover:border-blue-500 transition-all duration-200" data-metric="riding-data-date">
+                        <div class="flex items-center justify-between w-full">
+                            <div class="flex-grow min-w-0">
+                                <h3 class="text-xs font-medium text-gray-800 truncate">Riding Data Date</h3>
                             </div>
-                            <div class="bg-blue-100 p-1 rounded-full">
+                            <div class="bg-blue-100 p-1.5 rounded-full flex-shrink-0 ml-3">
                                 <i class="fas fa-calendar-check text-blue-600 text-sm"></i>
                             </div>
                         </div>
                     </div>
 
                     <!-- Invalid Dates -->
-                    <div class="metric-card bg-white rounded-lg shadow-lg p-2 cursor-pointer border-2 border-transparent hover:border-red-500 transition-all duration-200" data-metric="invalid-dates">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <h3 class="text-xs font-medium text-gray-800">Invalid Dates</h3>
+                    <div class="metric-card bg-white rounded-lg shadow-lg cursor-pointer border-2 border-transparent hover:border-red-500 transition-all duration-200" data-metric="invalid-dates">
+                        <div class="flex items-center justify-between w-full">
+                            <div class="flex-grow min-w-0">
+                                <h3 class="text-xs font-medium text-gray-800 truncate">Invalid Dates</h3>
                             </div>
-                            <div class="bg-red-100 p-1 rounded-full">
+                            <div class="bg-red-100 p-1.5 rounded-full flex-shrink-0 ml-3">
                                 <i class="fas fa-calendar-times text-red-600 text-sm"></i>
                             </div>
                         </div>
                     </div>
 
                     <!-- Resources -->
-                    <div class="metric-card bg-white rounded-lg shadow-lg p-2 cursor-pointer border-2 border-transparent" data-metric="resources">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <h3 class="text-xs font-medium text-gray-500">Resources</h3>
+                    <div class="metric-card bg-white rounded-lg shadow-lg cursor-pointer border-2 border-transparent" data-metric="resources">
+                        <div class="flex items-center justify-between w-full">
+                            <div class="flex-grow min-w-0">
+                                <h3 class="text-xs font-medium text-gray-500 truncate">Resources</h3>
                             </div>
-                            <div class="bg-blue-100 p-1 rounded-full">
+                            <div class="bg-blue-100 p-1.5 rounded-full flex-shrink-0 ml-3">
                                 <i class="fas fa-users text-blue-500 text-sm"></i>
                             </div>
                         </div>
