@@ -37,6 +37,13 @@ function setupEventListeners() {
         // Set initial styles
         card.style.border = '1px solid transparent';
         card.style.transition = 'all 0.2s ease-in-out';
+        card.style.padding = '4px';  // Compact internal padding
+        card.style.margin = '0';     // Remove margin completely
+        card.style.gap = '0';        // Remove gap completely
+        card.style.minWidth = '0';   // Allow cards to shrink if needed
+        card.style.flexGrow = '1';   // Allow cards to grow equally
+        card.style.flexBasis = '0';  // Equal base size for all cards
+        card.style.height = 'auto';  // Let height adjust to content
         
         // Add hover state
         card.addEventListener('mouseenter', function() {
@@ -50,11 +57,17 @@ function setupEventListeners() {
                 'non-fs': '#EF4444',     // red-500
                 'open-ends': '#14B8A6',  // teal-500
                 'constraints': '#6366F1', // indigo-500
-                'excessive-durations': '#9333EA'  // purple-600
+                'excessive-durations': '#9333EA',  // purple-600
+                'negative-float': '#2563EB',  // blue-600
+                'critical-float': '#FBBF24',  // amber-400
+                'excessive-float': '#DC2626',  // red-600
+                'invalid-dates': '#EF4444',  // red-500
+                'riding-data-date': '#3B82F6',  // blue-500
+                'resources': '#000000'  // black
             };
             
             if (colorMap[metric]) {
-                this.style.border = `2px solid ${colorMap[metric]}`;
+                this.style.border = `1px solid ${colorMap[metric]}`; // Thinner border on hover
             }
         });
 
@@ -71,6 +84,26 @@ function setupEventListeners() {
             const metric = this.dataset.metric;
             selectMetric(metric);
         });
+    });
+
+    // Update the grid container styles
+    const gridContainer = document.querySelector('.grid');
+    if (gridContainer) {
+        gridContainer.style.display = 'grid';
+        gridContainer.style.gridTemplateRows = 'auto auto';  // Two rows
+        gridContainer.style.gap = '4px';     // Consistent gap for both rows and columns
+        gridContainer.style.padding = '4px';  // Add small padding around the grid
+        gridContainer.style.backgroundColor = '#ffffff'; // White background
+        gridContainer.style.marginBottom = '16px';  // Add space before KPI section
+    }
+
+    // Update each row to ensure consistent layout
+    document.querySelectorAll('.grid-row').forEach(row => {
+        row.style.display = 'grid';
+        row.style.gridTemplateColumns = 'repeat(7, 1fr)'; // 7 equal columns
+        row.style.gap = '4px';  // Same gap as the main grid
+        row.style.margin = '0';
+        row.style.padding = '0';
     });
     
     // Project filter
@@ -164,7 +197,13 @@ function selectMetric(metric) {
             'non-fs': '#EF4444',     // red-500
             'open-ends': '#14B8A6',  // teal-500
             'constraints': '#6366F1', // indigo-500
-            'excessive-durations': '#9333EA'  // purple-600
+            'excessive-durations': '#9333EA',  // purple-600
+            'negative-float': '#2563EB',  // blue-600
+            'critical-float': '#FBBF24',  // amber-400
+            'excessive-float': '#DC2626',  // red-600
+            'invalid-dates': '#EF4444',  // red-500
+            'riding-data-date': '#3B82F6',  // blue-500
+            'resources': '#000000'  // black
         };
         
         selectedCard.style.border = `2px solid ${colorMap[metric]}`;
@@ -333,6 +372,8 @@ function getTableEndpoint(metric) {
 function updateKPISection(data, metric) {
     const kpiSection = document.getElementById('kpi-section');
     kpiSection.innerHTML = '';
+    kpiSection.style.marginTop = '16px';  // Add margin top to create space below metrics
+    kpiSection.style.paddingTop = '8px';  // Add padding to separate from metrics
     
     const kpiCards = getKPICards(data, metric);
     kpiCards.forEach(card => {
@@ -423,9 +464,9 @@ function getKPICards(data, metric) {
             ];
         case 'resources':
             return [
-                { title: 'Resource Load Count', value: data.resourceload_count || 0, color: 'blue' },
-                { title: 'Remaining Activities', value: data.remaining_activities || 0, color: 'red' },
-                { title: 'Resource Load %', value: (parseFloat(data.resource_load_percentage || 0)).toFixed(1) + '%', color: 'orange' }
+                { title: 'Resource Load Count', value: data.resourceload_count || 0, color: 'black' },
+                { title: 'Remaining Activities', value: data.remaining_activities || 0, color: 'black' },
+                { title: 'Resource Load %', value: (parseFloat(data.resource_load_percentage || 0)).toFixed(1) + '%', color: 'black' }
             ];
         default:
             return [];
@@ -434,11 +475,16 @@ function getKPICards(data, metric) {
 
 function createKPICard(card) {
     const div = document.createElement('div');
-    div.className = 'bg-white rounded-lg shadow p-2';
+    div.className = 'bg-white rounded-lg shadow p-1';  // Reduced padding from p-2 to p-1
+    
+    // Special handling for resources metric to use black text
+    const titleColorClass = currentMetric === 'resources' ? 'text-black' : 'text-gray-500';
+    const valueColorClass = currentMetric === 'resources' ? 'text-black' : `text-${card.color}-600`;
+    
     div.innerHTML = `
         <div class="text-center">
-            <h3 class="text-gray-500 text-xs mb-1">${card.title}</h3>
-            <p class="text-sm font-medium text-${card.color}-600">${card.value}</p>
+            <h3 class="${titleColorClass} text-[10px] mb-1">${card.title}</h3>
+            <p class="text-[11px] font-medium ${valueColorClass} mt-1">${card.value}</p>
         </div>
     `;
     return div;
