@@ -4025,21 +4025,21 @@ app.get('/api/schedule/resources-percentage-history', async (req, res) => {
         const query = `
             WITH monthly_metrics AS (
                 SELECT 
-                    TO_CHAR(p.last_recalc_date, 'YYYY-MM') as monthyear,
-                    COUNT(*) FILTER (WHERE a.resource IS NOT NULL AND a.activitystatus IN ('Active', 'NotStart')) as resource_load_count,
-                    COUNT(*) FILTER (WHERE a.activitystatus != 'Complete' AND a.relationshipstatus = 'Incomplete') as remaining_activities
+                    TO_CHAR(p.last_recalc_date, 'YYYY-MM-DD') as monthyear,
+                    COUNT(DISTINCT a.resource) as resource_load_count,
+                    COUNT(*) FILTER (WHERE a.activitystatus != 'Complete') as remaining_activities
                 FROM project p
                 LEFT JOIN activityanalysisview a ON a.projectid = p.projectid
                 WHERE p.last_recalc_date IS NOT NULL ${projectFilter}
-                GROUP BY TO_CHAR(p.last_recalc_date, 'YYYY-MM')
-                ORDER BY monthyear
+                GROUP BY p.last_recalc_date
+                ORDER BY p.last_recalc_date
             )
             SELECT 
                 monthyear as date,
                 CASE 
                     WHEN remaining_activities = 0 THEN 0
-                    ELSE ROUND((resource_load_count::decimal / remaining_activities) * 100, 1)
-                END as percentage
+                    ELSE TRUNC((resource_load_count::numeric / remaining_activities::numeric) * 100, 1)
+                END as value
             FROM monthly_metrics;`;
 
         const result = await db.query(query, params);

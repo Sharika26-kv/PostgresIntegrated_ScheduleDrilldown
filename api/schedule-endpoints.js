@@ -79,41 +79,42 @@ async function getResourcesPercentageHistory(req, res) {
     console.log(`📊 Fetching resources percentage history for project: ${projectId}`);
     
     const query = `
-        WITH RECURSIVE dates AS (
-            SELECT current_date - interval '6 days' as date
-            UNION ALL
-            SELECT date + interval '1 day'
-            FROM dates
-            WHERE date < current_date
+        WITH project_dates AS (
+            SELECT 
+                p.proj_id,
+                p.last_recalc_date::timestamp as date
+            FROM project p
+            WHERE ${projectId ? 'p.proj_id = $1' : '1=1'}
         ),
         daily_stats AS (
             SELECT 
-                d.date,
-                COUNT(DISTINCT tr.taskrsrc_id)::integer as resource_count,
-                COUNT(DISTINCT t.task_id)::integer as total_activities
-            FROM dates d
-            LEFT JOIN task t ON t.status_code = 'TK_NotStart'
-                ${projectId ? 'AND t.proj_id = $1' : ''}
+                pd.date,
+                pd.proj_id,
+                -- Count distinct resources assigned to tasks
+                COUNT(DISTINCT tr.rsrc_id)::integer as resource_count,
+                -- Count remaining activities (not complete)
+                COUNT(DISTINCT CASE WHEN t.status_code != 'Completed' THEN t.task_id END)::integer as remaining_activities
+            FROM project_dates pd
+            LEFT JOIN task t ON t.proj_id = pd.proj_id
             LEFT JOIN taskrsrc tr ON tr.task_id = t.task_id
-            GROUP BY d.date
+            GROUP BY pd.date, pd.proj_id
         )
         SELECT 
-            TO_CHAR(date, 'YYYY-MM-DD') as date,
+            TO_CHAR(date::timestamp, 'YYYY-MM') as date,
             CASE 
-                WHEN total_activities > 0 
-                THEN TRUNC((resource_count::numeric / total_activities::numeric) * 100, 2)
-                ELSE 0 
-            END as percentage
+                WHEN remaining_activities = 0 THEN 0
+                ELSE TRUNC((resource_count::numeric / remaining_activities::numeric) * 100, 2)
+            END as value
         FROM daily_stats
-        ORDER BY date
+        ORDER BY date ASC;
     `;
-    
+
     try {
         const result = await db.query(query, projectId ? [projectId] : []);
         res.json(result.rows);
-    } catch (err) {
-        console.error('❌ Error fetching resources percentage history:', err);
-        res.status(500).json({ error: err.message });
+    } catch (error) {
+        console.error('Error fetching resources percentage history:', error);
+        res.status(500).json({ error: error.message });
     }
 }
 
