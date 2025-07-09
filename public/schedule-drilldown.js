@@ -37,38 +37,25 @@ function setupEventListeners() {
         // Set initial styles
         card.style.border = '1px solid transparent';
         card.style.transition = 'all 0.2s ease-in-out';
-        card.style.padding = '4px';  // Compact internal padding
-        card.style.margin = '0';     // Remove margin completely
-        card.style.gap = '0';        // Remove gap completely
+        card.style.padding = '4px';  // Consistent padding
+        card.style.margin = '0';     // Remove margin
+        card.style.gap = '0';        // Remove gap
         card.style.minWidth = '0';   // Allow cards to shrink if needed
         card.style.flexGrow = '1';   // Allow cards to grow equally
         card.style.flexBasis = '0';  // Equal base size for all cards
         card.style.height = 'auto';  // Let height adjust to content
         
+        // Force black text color for all metric text
+        const metricTexts = card.querySelectorAll('*');
+        metricTexts.forEach(element => {
+            element.style.color = '#000000';
+        });
+        
         // Add hover state
         card.addEventListener('mouseenter', function() {
             console.log('Hovering over metric:', this.dataset.metric);
             const metric = this.dataset.metric;
-            const colorMap = {
-                'leads': '#3B82F6',      // blue-500
-                'lags': '#10B981',       // green-500
-                'excessive-lags': '#F97316', // orange-500
-                'fs': '#8B5CF6',         // purple-500
-                'non-fs': '#EF4444',     // red-500
-                'open-ends': '#14B8A6',  // teal-500
-                'constraints': '#6366F1', // indigo-500
-                'excessive-durations': '#9333EA',  // purple-600
-                'negative-float': '#2563EB',  // blue-600
-                'critical-float': '#FBBF24',  // amber-400
-                'excessive-float': '#DC2626',  // red-600
-                'invalid-dates': '#EF4444',  // red-500
-                'riding-data-date': '#3B82F6',  // blue-500
-                'resources': '#000000'  // black
-            };
-            
-            if (colorMap[metric]) {
-                this.style.border = `1px solid ${colorMap[metric]}`; // Thinner border on hover
-            }
+            this.style.border = '1px solid #000000';  // Black border on hover
         });
 
         card.addEventListener('mouseleave', function() {
@@ -91,17 +78,17 @@ function setupEventListeners() {
     if (gridContainer) {
         gridContainer.style.display = 'grid';
         gridContainer.style.gridTemplateRows = 'auto auto';  // Two rows
-        gridContainer.style.gap = '4px';     // Consistent gap for both rows and columns
-        gridContainer.style.padding = '4px';  // Add small padding around the grid
-        gridContainer.style.backgroundColor = '#ffffff'; // White background
-        gridContainer.style.marginBottom = '16px';  // Add space before KPI section
+        gridContainer.style.gap = '2px';     // Consistent small gap
+        gridContainer.style.padding = '2px';  // Small padding around the grid
+        gridContainer.style.backgroundColor = '#ffffff';
+        gridContainer.style.marginBottom = '8px';  // Reduced margin before KPI section
     }
 
     // Update each row to ensure consistent layout
     document.querySelectorAll('.grid-row').forEach(row => {
         row.style.display = 'grid';
         row.style.gridTemplateColumns = 'repeat(7, 1fr)'; // 7 equal columns
-        row.style.gap = '4px';  // Same gap as the main grid
+        row.style.gap = '2px';  // Same gap as the main grid
         row.style.margin = '0';
         row.style.padding = '0';
     });
@@ -372,8 +359,13 @@ function getTableEndpoint(metric) {
 function updateKPISection(data, metric) {
     const kpiSection = document.getElementById('kpi-section');
     kpiSection.innerHTML = '';
-    kpiSection.style.marginTop = '16px';  // Add margin top to create space below metrics
-    kpiSection.style.paddingTop = '8px';  // Add padding to separate from metrics
+    kpiSection.style.marginTop = '6px';  // Moderate margin
+    kpiSection.style.paddingTop = '3px';  // Moderate padding
+    kpiSection.style.display = 'grid';
+    kpiSection.style.gridTemplateColumns = 'repeat(3, 1fr)';
+    kpiSection.style.gap = '3px';  // Moderate gap between cards
+    kpiSection.style.maxWidth = '100%';
+    kpiSection.style.overflow = 'hidden';
     
     const kpiCards = getKPICards(data, metric);
     kpiCards.forEach(card => {
@@ -475,18 +467,35 @@ function getKPICards(data, metric) {
 
 function createKPICard(card) {
     const div = document.createElement('div');
-    div.className = 'bg-white rounded-lg shadow p-1';  // Reduced padding from p-2 to p-1
+    div.className = 'bg-white rounded-lg shadow';
+    div.style.padding = '3px';  // Moderate padding
+    div.style.margin = '0';
+    div.style.minWidth = '0';
     
     // Special handling for resources metric to use black text
     const titleColorClass = currentMetric === 'resources' ? 'text-black' : 'text-gray-500';
     const valueColorClass = currentMetric === 'resources' ? 'text-black' : `text-${card.color}-600`;
     
-    div.innerHTML = `
-        <div class="text-center">
-            <h3 class="${titleColorClass} text-[10px] mb-1">${card.title}</h3>
-            <p class="text-[11px] font-medium ${valueColorClass} mt-1">${card.value}</p>
-        </div>
-    `;
+    const container = document.createElement('div');
+    container.className = 'text-center';
+    container.style.lineHeight = '1.2';  // Slightly more spacing
+    
+    const title = document.createElement('h3');
+    title.className = `${titleColorClass}`;
+    title.style.fontSize = '9px';  // Increased from 8px
+    title.style.marginBottom = '3px';  // Increased spacing
+    title.textContent = card.title;
+    
+    const value = document.createElement('p');
+    value.className = `font-medium ${valueColorClass}`;
+    value.style.fontSize = '10px';  // Increased from 9px
+    value.style.marginTop = '3px';  // Increased spacing
+    value.textContent = card.value;
+    
+    container.appendChild(title);
+    container.appendChild(value);
+    div.appendChild(container);
+    
     return div;
 }
 
