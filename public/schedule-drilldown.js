@@ -391,21 +391,21 @@ function getKPICards(data, metric) {
     switch (metric) {
         case 'leads':
             return [
-                { title: 'Total Relationships', value: data.Total_Relationship_Count || 0, color: 'blue' },
+                { title: 'Leads Count', value: data.Leads_Count || 0, color: 'blue' },
                 { title: 'Remaining Relationships', value: data.Remaining_Relationship_Count || 0, color: 'red' },
-                { title: 'Leads', value: data.Leads_Count || 0, color: 'green' }
+                { title: 'Lead (%)', value: (data.Lead_Percentage || 0).toFixed(2) + '%', color: 'green' }
             ];
         case 'lags':
             return [
-                { title: 'Total Relationships', value: data.Total_Relationship_Count || 0, color: 'blue' },
+                { title: 'Lag Count', value: data.Lag_Count || 0, color: 'blue' },
                 { title: 'Remaining Relationships', value: data.Remaining_Relationship_Count || 0, color: 'red' },
-                { title: 'Lags', value: data.Lags_Count || 0, color: 'green' }
+                { title: 'Lag (%)', value: (data.Lag_Percentage || 0).toFixed(2) + '%', color: 'green' }
             ];
         case 'excessive-lags':
             return [
-                { title: 'Total Relationships', value: data.Total_Relationship_Count || 0, color: 'blue' },
+                { title: 'Lag Count', value: data.Lag_Count || 0, color: 'blue' },
                 { title: 'Remaining Relationships', value: data.Remaining_Relationship_Count || 0, color: 'red' },
-                { title: 'Excessive Lags', value: data.ExcessiveLags_Count || 0, color: 'orange' }
+                { title: 'Lag (%)', value: (data.Lag_Percentage || 0).toFixed(2) + '%', color: 'orange' }
             ];
         case 'fs':
             return [

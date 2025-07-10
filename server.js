@@ -1353,30 +1353,37 @@ app.get('/api/schedule/leads-kpi', async (req, res) => {
     try {
         const projectId = req.query.project_id;
         
-        // Use PostgreSQL queries from migration script
-        const leadsQuery = `SELECT COUNT(*) as leads_count FROM activity_relationship_view WHERE relationship_status = 'Incomplete' AND CAST(lag AS REAL) < 0` + (projectId && projectId !== 'all' ? ` AND project_id = $1` : '');
-        const remainingQuery = `SELECT COUNT(*) as remaining_count FROM activity_relationship_view WHERE relationship_status = 'Incomplete'` + (projectId && projectId !== 'all' ? ` AND project_id = $1` : '');
-        const totalQuery = `SELECT COUNT(*) as total_count FROM activity_relationship_view` + (projectId && projectId !== 'all' ? ` WHERE project_id = $1` : '');
+        // Query for leads count (with lag < 0 and incomplete status)
+        const leadsQuery = `
+            SELECT COUNT(*) as leads_count 
+            FROM activity_relationship_view 
+            WHERE relationship_status = 'Incomplete' 
+            AND CAST(lag AS REAL) < 0
+        ` + (projectId && projectId !== 'all' ? ` AND project_id = $1` : '');
+        
+        // Query for remaining count (only incomplete status)
+        const remainingQuery = `
+            SELECT COUNT(*) as remaining_count 
+            FROM activity_relationship_view 
+            WHERE relationship_status = 'Incomplete'
+        ` + (projectId && projectId !== 'all' ? ` AND project_id = $1` : '');
         
         const params = projectId && projectId !== 'all' ? [projectId] : [];
         
-        // Get leads count, remaining relationships count, and total relationships count
-        const [leadsResult, remainingResult, totalResult] = await Promise.all([
+        // Get leads count and remaining relationships count
+        const [leadsResult, remainingResult] = await Promise.all([
             db.query(leadsQuery, params),
-            db.query(remainingQuery, params),
-            db.query(totalQuery, params)
+            db.query(remainingQuery, params)
         ]);
         
-        const leadsCount = leadsResult.rows[0]?.leads_count || 0;
-        const remainingCount = remainingResult.rows[0]?.remaining_count || 0;
-        const totalCount = totalResult.rows[0]?.total_count || 0;
+        const leadsCount = parseInt(leadsResult.rows[0]?.leads_count || 0);
+        const remainingCount = parseInt(remainingResult.rows[0]?.remaining_count || 0);
         const leadPercentage = remainingCount > 0 ? Math.round((leadsCount * 100.0) / remainingCount * 100) / 100 : 0;
         
         res.json({
-            Total_Relationship_Count: totalCount,
-            Remaining_Relationship_Count: remainingCount,
             Leads_Count: leadsCount,
-            lead_Percentage: leadPercentage
+            Remaining_Relationship_Count: remainingCount,
+            Lead_Percentage: leadPercentage
         });
     } catch (error) {
         console.error(`${logPrefix} Error in leads-kpi endpoint:`, error);
@@ -1463,7 +1470,7 @@ app.get('/api/schedule/leads', async (req, res) => {
         const projectId = req.query.project_id;
         const limit = req.query.limit || 20;
         
-        // Use PostgreSQL leads detail query from migration script
+        // Query for leads table data with correct filters
         let query = `
             SELECT
                 activity_id as "Pred. ID",
@@ -1478,7 +1485,8 @@ app.get('/api/schedule/leads', async (req, res) => {
                 excessive_lag as "ExcessiveLag",
                 relationship_status as "Relationship_Status"
             FROM activity_relationship_view 
-            WHERE relationship_status = 'Incomplete' AND CAST(lag AS REAL) < 0
+            WHERE relationship_status = 'Incomplete' 
+            AND CAST(lag AS REAL) < 0
         `;
         
         const params = [];
@@ -1487,7 +1495,7 @@ app.get('/api/schedule/leads', async (req, res) => {
             params.push(projectId);
         }
         
-        query += ` ORDER BY lag, relationship_type LIMIT $${params.length + 1}`;
+        query += ` ORDER BY CAST(lag AS REAL) ASC LIMIT $${params.length + 1}`;
         params.push(parseInt(limit));
         
         const result = await db.query(query, params);
@@ -1503,11 +1511,20 @@ app.get('/api/schedule/lags-kpi', async (req, res) => {
     try {
         const projectId = req.query.project_id;
         
-        // Use PostgreSQL lags KPI query from migration script
+        // Query for lag count (with lag > 0 and incomplete status)
+        const lagsQuery = `
+            SELECT COUNT(*) as lags_count 
+            FROM activity_relationship_view 
+            WHERE relationship_status = 'Incomplete' 
+            AND CAST(lag AS REAL) > 0
+        ` + (projectId && projectId !== 'all' ? ` AND project_id = $1` : '');
         
-        // Convert to PostgreSQL queries
-        const lagsQuery = `SELECT COUNT(*) as lags_count FROM activity_relationship_view WHERE relationship_status = 'Incomplete' AND CAST(lag AS REAL) > 0` + (projectId && projectId !== 'all' ? ` AND project_id = $1` : '');
-        const remainingQuery = `SELECT COUNT(*) as remaining_count FROM activity_relationship_view WHERE relationship_status = 'Incomplete'` + (projectId && projectId !== 'all' ? ` AND project_id = $1` : '');
+        // Query for remaining count (only incomplete status)
+        const remainingQuery = `
+            SELECT COUNT(*) as remaining_count 
+            FROM activity_relationship_view 
+            WHERE relationship_status = 'Incomplete'
+        ` + (projectId && projectId !== 'all' ? ` AND project_id = $1` : '');
         
         const queryParams = projectId && projectId !== 'all' ? [projectId] : [];
         
@@ -1516,15 +1533,14 @@ app.get('/api/schedule/lags-kpi', async (req, res) => {
             db.query(remainingQuery, queryParams)
         ]);
         
-        const lagsCount = result.rows[0]?.lags_count || 0;
-        const remainingCount = remainingResult.rows[0]?.remaining_count || 0;
+        const lagsCount = parseInt(result.rows[0]?.lags_count || 0);
+        const remainingCount = parseInt(remainingResult.rows[0]?.remaining_count || 0);
         const lagPercentage = remainingCount > 0 ? Math.round((lagsCount * 100.0) / remainingCount * 100) / 100 : 0;
         
         res.json({
-            Total_Relationship_Count: remainingCount,
+            Lag_Count: lagsCount,
             Remaining_Relationship_Count: remainingCount,
-            Lags_Count: lagsCount,
-            lag_Percentage: lagPercentage
+            Lag_Percentage: lagPercentage
         });
     } catch (error) {
         console.error('[Schedule API] Error in lags-kpi endpoint:', error);
@@ -1610,17 +1626,8 @@ app.get('/api/schedule/lags', async (req, res) => {
         const projectId = req.query.project_id;
         const limit = req.query.limit || 20;
         
-        let filters = ["relationship_status = 'Incomplete'", "lag != '0'", "lag IS NOT NULL"];
-        const params = [];
-        
-        if (projectId && projectId !== 'all') {
-            filters.push('project_id = $1');
-            params.push(projectId);
-        }
-        
-        const whereClause = filters.length > 0 ? 'WHERE ' + filters.join(' AND ') : '';
-        
-        const query = `
+        // Query for lags table data with correct filters
+        let query = `
             SELECT
                 activity_id as "Pred. ID",
                 activity_id2 as "Succ. ID", 
@@ -1633,18 +1640,22 @@ app.get('/api/schedule/lags', async (req, res) => {
                 lead as "Lead",
                 excessive_lag as "ExcessiveLag",
                 relationship_status as "Relationship_Status"
-            FROM activity_relationship_view
-            ${whereClause}
-            ORDER BY activity_id
-            LIMIT $${params.length + 1}
+            FROM activity_relationship_view 
+            WHERE relationship_status = 'Incomplete' 
+            AND CAST(lag AS REAL) > 0
         `;
         
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND project_id = $1`;
+            params.push(projectId);
+        }
+        
+        query += ` ORDER BY CAST(lag AS REAL) DESC LIMIT $${params.length + 1}`;
         params.push(parseInt(limit));
         
         const result = await db.query(query, params);
-        const rows = result.rows;
-        
-        res.json(rows);
+        res.json(result.rows);
     } catch (error) {
         console.error('[Schedule API] Error in lags endpoint:', error);
         res.status(500).json({ error: 'Failed to fetch lags data' });
@@ -1656,34 +1667,37 @@ app.get('/api/schedule/excessive-lags-kpi', async (req, res) => {
     try {
         const projectId = req.query.project_id;
         
-        // Calculate excessive lags KPI directly from activity_relationship_view
-        let filters = ["relationship_status = 'Incomplete'", "excessive_lag IS NOT NULL", "excessive_lag != ''"];
-        const params = [];
+        // Query for excessive lag count (with excessive_lag = "Excessive Lag" and incomplete status)
+        const excessiveLagsQuery = `
+            SELECT COUNT(*) as excessive_lags_count 
+            FROM activity_relationship_view 
+            WHERE relationship_status = 'Incomplete' 
+            AND excessive_lag = 'Excessive Lag'
+            AND CAST(lag AS REAL) > 0
+        ` + (projectId && projectId !== 'all' ? ` AND project_id = $1` : '');
         
-        if (projectId && projectId !== 'all') {
-            filters.push('project_id = $1');
-            params.push(projectId);
-        }
+        // Query for remaining count (only incomplete status)
+        const remainingQuery = `
+            SELECT COUNT(*) as remaining_count 
+            FROM activity_relationship_view 
+            WHERE relationship_status = 'Incomplete'
+        ` + (projectId && projectId !== 'all' ? ` AND project_id = $1` : '');
         
-        const whereClause = filters.length > 0 ? 'WHERE ' + filters.join(' AND ') : '';
+        const queryParams = projectId && projectId !== 'all' ? [projectId] : [];
         
-        const excessiveLagsQuery = `SELECT COUNT(*) as excessive_lags_count FROM activity_relationship_view ${whereClause}`;
-        const totalQuery = `SELECT COUNT(*) as total_count FROM activity_relationship_view WHERE relationship_status = 'Incomplete'` + (projectId && projectId !== 'all' ? ` AND project_id = $1` : '');
-        
-        const [excessiveResult, totalResult] = await Promise.all([
-            db.query(excessiveLagsQuery, params),
-            db.query(totalQuery, projectId && projectId !== 'all' ? [projectId] : [])
+        const [result, remainingResult] = await Promise.all([
+            db.query(excessiveLagsQuery, queryParams),
+            db.query(remainingQuery, queryParams)
         ]);
         
-        const excessiveLagsCount = excessiveResult.rows[0]?.excessive_lags_count || 0;
-        const totalCount = totalResult.rows[0]?.total_count || 0;
-        const excessiveLagPercentage = totalCount > 0 ? Math.round((excessiveLagsCount * 100.0) / totalCount * 100) / 100 : 0;
+        const excessiveLagsCount = parseInt(result.rows[0]?.excessive_lags_count || 0);
+        const remainingCount = parseInt(remainingResult.rows[0]?.remaining_count || 0);
+        const excessiveLagPercentage = remainingCount > 0 ? Math.round((excessiveLagsCount * 100.0) / remainingCount * 100) / 100 : 0;
         
         res.json({
-            Total_Relationship_Count: totalCount,
-            Remaining_Relationship_Count: totalCount,
-            ExcessiveLags_Count: excessiveLagsCount,
-            ExcessiveLag_Percentage: excessiveLagPercentage
+            Lag_Count: excessiveLagsCount,
+            Remaining_Relationship_Count: remainingCount,
+            Lag_Percentage: excessiveLagPercentage
         });
     } catch (error) {
         console.error('[Schedule API] Error in excessive-lags-kpi endpoint:', error);
@@ -1782,17 +1796,8 @@ app.get('/api/schedule/excessive-lags', async (req, res) => {
         const projectId = req.query.project_id;
         const limit = req.query.limit || 20;
         
-        let filters = ["relationship_status = 'Incomplete'", "excessive_lag > '0'"];
-        const params = [];
-        
-        if (projectId && projectId !== 'all') {
-            filters.push('project_id = $1');
-            params.push(projectId);
-        }
-        
-        const whereClause = filters.length > 0 ? 'WHERE ' + filters.join(' AND ') : '';
-        
-        const query = `
+        // Query for excessive lags table data with correct filters
+        let query = `
             SELECT
                 activity_id as "Pred. ID",
                 activity_id2 as "Succ. ID", 
@@ -1805,18 +1810,23 @@ app.get('/api/schedule/excessive-lags', async (req, res) => {
                 lead as "Lead",
                 excessive_lag as "ExcessiveLag",
                 relationship_status as "Relationship_Status"
-            FROM activity_relationship_view
-            ${whereClause}
-            ORDER BY activity_id
-            LIMIT $${params.length + 1}
+            FROM activity_relationship_view 
+            WHERE relationship_status = 'Incomplete' 
+            AND excessive_lag = 'Excessive Lag'
+            AND CAST(lag AS REAL) > 0
         `;
         
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND project_id = $1`;
+            params.push(projectId);
+        }
+        
+        query += ` ORDER BY CAST(lag AS REAL) DESC LIMIT $${params.length + 1}`;
         params.push(parseInt(limit));
         
         const result = await db.query(query, params);
-        const rows = result.rows;
-        
-        res.json(rows);
+        res.json(result.rows);
     } catch (error) {
         console.error('[Schedule API] Error in excessive-lags endpoint:', error);
         res.status(500).json({ error: 'Failed to fetch excessive lags data' });
