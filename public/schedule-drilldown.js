@@ -294,8 +294,8 @@ function getKPIEndpoint(metric) {
         'leads': '/api/schedule/leads-kpi',
         'lags': '/api/schedule/lags-kpi',
         'excessive-lags': '/api/schedule/excessive-lags-kpi',
-        'fs': '/api/schedule/fs-kpi',
-        'non-fs': '/api/schedule/non-fs-kpi',
+        'fs': '/api/schedule/relationship-metrics',  // FS+0d endpoint
+        'non-fs': '/api/schedule/non-fs-relationship-metrics',  // Non-FS endpoint
         'open-ends': '/api/schedule/open-ends-kpi',
         'constraints': '/api/schedule/constraints-kpi',
         'excessive-durations': '/api/schedule/excessive-durations-kpi',
@@ -409,15 +409,27 @@ function getKPICards(data, metric) {
             ];
         case 'fs':
             return [
-                { title: 'Total Relationships', value: data.Total_Relationship_Count || 0, color: 'blue' },
-                { title: 'Remaining Relationships', value: data.Remaining_Relationship_Count || 0, color: 'red' },
-                { title: 'FS+0d', value: data.FS_Count || 0, color: 'green' }
+                { 
+                    title: 'Total Relationships', 
+                    value: data.Total_FS_Count || 0, 
+                    color: 'blue'
+                },
+                { 
+                    title: 'Remaining Relationships', 
+                    value: data.Remaining_Count || 0, 
+                    color: 'red'
+                },
+                { 
+                    title: 'Lag Count', 
+                    value: data.Lag_Count || 0, 
+                    color: 'green'
+                }
             ];
         case 'non-fs':
             return [
                 { title: 'Total Relationships', value: data.Total_Relationship_Count || 0, color: 'blue' },
-                { title: 'Remaining Relationships', value: data.Remaining_Relationship_Count || 0, color: 'red' },
-                { title: 'Non FS+0d', value: data.NonFS_Count || 0, color: 'orange' }
+                { title: 'Remaining Relationships', value: data.Remaining_Count || 0, color: 'red' },
+                { title: 'Lag Count', value: data.Lag_Count || 0, color: 'green' }
             ];
         case 'open-ends':
             return [

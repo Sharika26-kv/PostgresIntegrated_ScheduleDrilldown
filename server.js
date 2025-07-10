@@ -1999,6 +1999,58 @@ app.get('/api/schedule/non-fs-chart-data', async (req, res) => {
     }
 });
 
+// Relationship Metrics KPI endpoint
+app.get('/api/schedule/relationship-metrics', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        const params = [];
+        let projectFilter = '';
+        
+        if (projectId && projectId !== 'all') {
+            projectFilter = 'WHERE project_id = $1';
+            params.push(projectId);
+        }
+
+        // Get Total and Remaining Relationship Counts with correct filters
+        const query = `
+            WITH metrics AS (
+                SELECT 
+                    COUNT(*) FILTER (
+                        WHERE relationship_status = 'Incomplete' 
+                        AND relationship_type = 'PR_FS' 
+                        AND lag = '0'
+                    ) as total_fs_count,
+                    COUNT(*) FILTER (
+                        WHERE relationship_status = 'Incomplete'
+                    ) as remaining_count,
+                    COUNT(*) FILTER (
+                        WHERE relationship_status = 'Incomplete'
+                        AND relationship_type IN ('PR_FS', 'PR_FS1')
+                        AND CAST(lag AS INTEGER) > 0
+                    ) as lag_count
+                FROM activity_relationship_view
+                ${projectFilter}
+            )
+            SELECT 
+                total_fs_count as "Total_FS_Count",
+                remaining_count as "Remaining_Count",
+                lag_count as "Lag_Count"
+            FROM metrics
+        `;
+
+        const result = await db.query(query, params);
+        
+        if (!result.rows[0]) {
+            throw new Error('No data returned from query');
+        }
+        
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('[Schedule API] Error in relationship-metrics endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch Relationship Metrics data' });
+    }
+});
+
 // FS table data endpoint
 app.get('/api/schedule/fs', async (req, res) => {
     try {
@@ -2046,13 +2098,71 @@ app.get('/api/schedule/fs', async (req, res) => {
     }
 });
 
+// Non-FS Relationship Metrics KPI endpoint
+app.get('/api/schedule/non-fs-relationship-metrics', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        const params = [];
+        let projectFilter = '';
+        
+        if (projectId && projectId !== 'all') {
+            projectFilter = 'WHERE project_id = $1';
+            params.push(projectId);
+        }
+
+        // Get Total and Remaining Relationship Counts with correct filters
+        const query = `
+            WITH metrics AS (
+                SELECT 
+                    COUNT(*) FILTER (
+                        WHERE relationship_status = 'Incomplete'
+                        AND relationship_type NOT IN ('PR_FS', 'PR_FS1')
+                        AND CAST(lag AS INTEGER) != 0
+                    ) as total_non_fs_count,
+                    COUNT(*) FILTER (
+                        WHERE relationship_status = 'Incomplete'
+                    ) as remaining_count,
+                    COUNT(*) FILTER (
+                        WHERE relationship_status = 'Incomplete'
+                        AND relationship_type NOT IN ('PR_FS', 'PR_FS1')
+                        AND CAST(lag AS INTEGER) > 0
+                    ) as lag_count
+                FROM activity_relationship_view
+                ${projectFilter}
+            )
+            SELECT 
+                total_non_fs_count as "Total_Relationship_Count",
+                remaining_count as "Remaining_Count",
+                lag_count as "Lag_Count"
+            FROM metrics
+        `;
+
+        const result = await db.query(query, params);
+        
+        if (!result.rows[0]) {
+            throw new Error('No data returned from query');
+        }
+        
+        console.log('Metrics result:', result.rows[0]);
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('[Schedule API] Error in non-fs-relationship-metrics endpoint:', error);
+        console.error('Detailed error:', error.stack);
+        res.status(500).json({ error: 'Failed to fetch Non-FS Relationship Metrics data' });
+    }
+});
+
 // Non-FS table data endpoint
 app.get('/api/schedule/non-fs', async (req, res) => {
     try {
         const projectId = req.query.project_id;
         const limit = req.query.limit || 20;
         
-        let filters = ["relationship_status = 'Incomplete'", "(relationship_type != 'PR_FS' OR lag != '0')"];
+        let filters = [
+            "relationship_status = 'Incomplete'",
+            "relationship_type NOT IN ('PR_FS', 'PR_FS1')",
+            "CAST(lag AS INTEGER) != 0"
+        ];
         const params = [];
         
         if (projectId && projectId !== 'all') {
@@ -4107,5 +4217,111 @@ app.get('/api/schedule/test-view', async (req, res) => {
     } catch (error) {
         console.error('Error testing view:', error);
         res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Relationship Metrics KPI endpoints
+app.get('/api/schedule/relationship-metrics', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        const params = [];
+        let projectFilter = '';
+        
+        if (projectId && projectId !== 'all') {
+            projectFilter = 'WHERE project_id = $1';
+            params.push(projectId);
+        }
+
+        // Get Total and Remaining Relationship Counts with correct filters
+        const query = `
+            WITH metrics AS (
+                SELECT 
+                    COUNT(*) FILTER (
+                        WHERE relationship_status = 'Incomplete' 
+                        AND relationship_type = 'PR_FS' 
+                        AND lag = '0'
+                    ) as total_fs_count,
+                    COUNT(*) FILTER (
+                        WHERE relationship_status = 'Incomplete'
+                    ) as remaining_count,
+                    COUNT(*) FILTER (
+                        WHERE relationship_status = 'Incomplete'
+                        AND relationship_type IN ('PR_FS', 'PR_FS1')
+                        AND CAST(lag AS INTEGER) > 0
+                    ) as lag_count
+                FROM activity_relationship_view
+                ${projectFilter}
+            )
+            SELECT 
+                total_fs_count as "Total_FS_Count",
+                remaining_count as "Remaining_Count",
+                lag_count as "Lag_Count"
+            FROM metrics
+        `;
+
+        const result = await db.query(query, params);
+        
+        if (!result.rows[0]) {
+            throw new Error('No data returned from query');
+        }
+        
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('[Schedule API] Error in relationship-metrics endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch Relationship Metrics data' });
+    }
+});
+
+// Non-FS Relationship Metrics KPI endpoint
+app.get('/api/schedule/non-fs-relationship-metrics', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        const params = [];
+        let projectFilter = '';
+        
+        if (projectId && projectId !== 'all') {
+            projectFilter = 'WHERE project_id = $1';
+            params.push(projectId);
+        }
+
+        // Get Total and Remaining Relationship Counts with correct filters
+        const query = `
+            WITH metrics AS (
+                SELECT 
+                    COUNT(*) FILTER (
+                        WHERE relationship_status = 'Incomplete'
+                        AND relationship_type NOT IN ('PR_FS', 'PR_FS1')
+                        AND CAST(lag AS INTEGER) != 0
+                    ) as total_non_fs_count,
+                    COUNT(*) FILTER (
+                        WHERE relationship_status = 'Incomplete'
+                    ) as remaining_count,
+                    COUNT(*) FILTER (
+                        WHERE relationship_status = 'Incomplete'
+                        AND relationship_type NOT IN ('PR_FS', 'PR_FS1')
+                        AND CAST(lag AS INTEGER) > 0
+                    ) as lag_count
+                FROM activity_relationship_view
+                ${projectFilter}
+            )
+            SELECT 
+                total_non_fs_count as "Total_Relationship_Count",
+                remaining_count as "Remaining_Count",
+                lag_count as "Lag_Count"
+            FROM metrics
+        `;
+
+        const result = await db.query(query, params);
+        
+        if (!result.rows[0]) {
+            throw new Error('No data returned from query');
+        }
+        
+        console.log('Metrics result:', result.rows[0]);
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('[Schedule API] Error in non-fs-relationship-metrics endpoint:', error);
+        console.error('Detailed error:', error.stack);
+        res.status(500).json({ error: 'Failed to fetch Non-FS Relationship Metrics data' });
     }
 });
