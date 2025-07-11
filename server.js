@@ -1978,7 +1978,7 @@ app.get('/api/schedule/non-fs-chart-data', async (req, res) => {
         let filters = [
             "relationship_status = 'Incomplete'",
             "relationship_type NOT IN ('PR_FS', 'PR_FS1')",
-            "lag = '0'"
+            "CAST(lag AS INTEGER) != 0"
         ];
         const params = [];
         
