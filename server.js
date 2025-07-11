@@ -2617,7 +2617,7 @@ app.get('/api/schedule/open-ends-chart-data', async (req, res) => {
     try {
         const projectId = req.query.project_id;
         
-        let filters = [];
+        let filters = ["openends = 'Open End'"];
         const params = [];
         
         if (projectId && projectId !== 'all') {
@@ -2629,18 +2629,12 @@ app.get('/api/schedule/open-ends-chart-data', async (req, res) => {
         
         const query = `
             SELECT 
-                CASE 
-                    WHEN openends = 'Open End' THEN 'Open End'
-                    ELSE 'Closed Activities'
-                END as details,
+                activitytype as details,
                 COUNT(*) as value
             FROM activityanalysisview 
             ${whereClause}
-            GROUP BY CASE 
-                WHEN openends = 'Open End' THEN 'Open End'
-                ELSE 'Closed Activities'
-            END
-            ORDER BY details
+            GROUP BY activitytype
+            ORDER BY activitytype
         `;
         
         const result = await db.query(query, params);
