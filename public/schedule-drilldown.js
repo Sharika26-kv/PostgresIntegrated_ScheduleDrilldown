@@ -410,7 +410,7 @@ function getKPICards(data, metric) {
         case 'fs':
             return [
                 { 
-                    title: 'Total Relationships', 
+                    title: 'Relationships', 
                     value: data.Total_FS_Count || 0, 
                     color: 'blue'
                 },
@@ -427,7 +427,7 @@ function getKPICards(data, metric) {
             ];
         case 'non-fs':
             return [
-                { title: 'Total Relationships', value: data.Total_Relationship_Count || 0, color: 'blue' },
+                { title: 'Relationships', value: data.Total_Relationship_Count || 0, color: 'blue' },
                 { title: 'Remaining Relationships', value: data.Remaining_Count || 0, color: 'red' },
                 { title: 'Lag Count', value: data.Lag_Count || 0, color: 'green' }
             ];
