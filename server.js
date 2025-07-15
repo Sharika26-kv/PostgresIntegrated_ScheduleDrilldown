@@ -4178,6 +4178,12 @@ app.get('/api/schedule/resources', async (req, res) => {
         }
 
         const query = `
+            WITH resource_count AS (
+                SELECT COUNT(DISTINCT resource) as count
+                FROM activityanalysisview
+                WHERE activitystatus IN ('Active', 'NotStart')
+                ${projectFilter}
+            )
             SELECT 
                 activityid as "Activity ID",
                 activityname as "Activity Name",
@@ -4189,9 +4195,10 @@ app.get('/api/schedule/resources', async (req, res) => {
                 activitytype as "Activity Type",
                 activitystatus as "Activity Status",
                 resource as "Resource"
-            FROM activityanalysisview
+            FROM activityanalysisview, resource_count
             WHERE activitystatus IN ('Active', 'NotStart')
             AND resource IS NOT NULL
+            AND resource_count.count > 0
             ${projectFilter}
             ORDER BY "Activity ID"
             LIMIT $1;`;
