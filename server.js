@@ -10,6 +10,8 @@ const db = require('./config/database');
 const { spawn } = require('child_process');
 require('dotenv').config();
 
+console.log('🚀 SERVER.JS FILE LOADED - DEBUG VERSION');
+
 // Import Gantt Chart API endpoints
 const ganttApi = require('./api/gantt-endpoints');
 // Import Schedule API endpoints
@@ -2786,8 +2788,8 @@ app.get('/api/schedule/constraints-kpi', async (req, res) => {
     try {
         const projectId = req.query.project_id;
         
-        // Get Constraints count (activities with specific Primary Constraints)
-        let constraintFilters = ["primaryconstraint IN ('CS_MSO','CS_MSOB','CS_MSOA','CS_MEO','CS_MEOB','CS_MEOA','CS_ALAP')"];
+        // Get Constraints count (activities with specific Primary Constraints, excluding completed activities)
+        let constraintFilters = ["primaryconstraint IN ('CS_MSO','CS_MSOB','CS_MSOA','CS_MEO','CS_MEOB','CS_MEOA','CS_ALAP')", "activitystatus != 'Complete'"];
         const constraintParams = [];
         
         if (projectId && projectId !== 'all') {
@@ -2835,7 +2837,7 @@ app.get('/api/schedule/constraints-chart-data', async (req, res) => {
     try {
         const projectId = req.query.project_id;
         
-        let filters = ["primaryconstraint IN ('CS_MSO','CS_MSOB','CS_MSOA','CS_MEO','CS_MEOB','CS_MEOA','CS_ALAP')"];
+        let filters = ["primaryconstraint IN ('CS_MSO','CS_MSOB','CS_MSOA','CS_MEO','CS_MEOB','CS_MEOA','CS_ALAP')", "activitystatus != 'Complete'"];
         const params = [];
         
         if (projectId && projectId !== 'all') {
@@ -2874,7 +2876,7 @@ app.get('/api/schedule/constraints-percentage-history', async (req, res) => {
         let query = `
             SELECT
                 TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM') as date,
-                COUNT(CASE WHEN a.primaryconstraint IN ('CS_MSO','CS_MSOB','CS_MSOA','CS_MEO','CS_MEOB','CS_MEOA','CS_ALAP') THEN 1 END) * 100.0 / 
+                COUNT(CASE WHEN a.primaryconstraint IN ('CS_MSO','CS_MSOB','CS_MSOA','CS_MEO','CS_MEOB','CS_MEOA','CS_ALAP') AND a.activitystatus != 'Complete' THEN 1 END) * 100.0 / 
                 NULLIF(COUNT(CASE WHEN a.activitystatus != 'Complete' THEN 1 END), 0) as percentage
             FROM activityanalysisview a
             INNER JOIN project p ON a.projectid = p.proj_id
@@ -2909,7 +2911,7 @@ app.get('/api/schedule/constraints', async (req, res) => {
         const projectId = req.query.project_id;
         const limit = req.query.limit || 20;
         
-        let filters = ["primaryconstraint IN ('CS_MSO','CS_MSOB','CS_MSOA','CS_MEO','CS_MEOB','CS_MEOA','CS_ALAP')"];
+        let filters = ["primaryconstraint IN ('CS_MSO','CS_MSOB','CS_MSOA','CS_MEO','CS_MEOB','CS_MEOA','CS_ALAP')", "activitystatus != 'Complete'"];
         const params = [];
         
         if (projectId && projectId !== 'all') {
@@ -4050,10 +4052,14 @@ process.on('SIGINT', () => {
 // Resources KPI endpoint
 app.get('/api/schedule/resources-kpi', async (req, res) => {
     try {
-        console.log('📊 Fetching resources KPI data...');
+        console.log('🚀 RESOURCES KPI ENDPOINT CALLED - DEBUG TEST');
+        console.log('🚀 RESOURCES KPI ENDPOINT CALLED');
         const projectId = req.query.project_id;
+        console.log('📊 Fetching resources KPI data for project:', projectId);
         const params = [];
         let projectFilter = '';
+        
+        console.log('🔍 Starting Resources KPI calculation...');
         
         if (projectId && projectId !== 'all') {
             projectFilter = 'WHERE projectid = $1';
@@ -4061,10 +4067,17 @@ app.get('/api/schedule/resources-kpi', async (req, res) => {
         }
 
         // Get Resource Load Count and Remaining Activities
+        console.log('🔍 Building query with projectFilter:', projectFilter);
+        
         const query = `
             WITH metrics AS (
                 SELECT 
-                    COUNT(resource) as resource_load_count,
+                    COUNT(*) FILTER (
+                        WHERE activitystatus IN ('Active', 'NotStart')
+                        AND resource IS NOT NULL 
+                        AND resource != ''
+                        AND resource != ' '
+                    ) as resource_load_count,
                     COUNT(*) FILTER (
                         WHERE activitystatus != 'Complete'
                     ) as remaining_activities
@@ -4080,10 +4093,32 @@ app.get('/api/schedule/resources-kpi', async (req, res) => {
                 END as "Resource_Load_Percentage"
             FROM metrics;`;
 
+        console.log('🔍 About to execute query...');
         console.log('Executing query:', query);
-        const result = await db.query(query, params);
-        console.log('Query result:', result.rows[0]);
-        res.json(result.rows[0]);
+        console.log('Query parameters:', params);
+        
+        try {
+            const result = await db.query(query, params);
+            console.log('Query executed successfully');
+            console.log('Query result:', result.rows[0]);
+            
+            // Debug: Check if we're getting the expected data
+            if (!result.rows[0]) {
+                console.log('No data returned from query');
+                res.json({
+                    ResourceLoad_Count: 0,
+                    Remaining_Activities: 0,
+                    Resource_Load_Percentage: 0
+                });
+                return;
+            }
+            
+            console.log('Sending response:', result.rows[0]);
+            res.json(result.rows[0]);
+        } catch (dbError) {
+            console.error('Database query error:', dbError);
+            res.status(500).json({ error: 'Database query failed' });
+        }
     } catch (error) {
         console.error('Error fetching resources KPI:', error);
         res.status(500).json({ error: 'Internal server error' });
@@ -4178,12 +4213,6 @@ app.get('/api/schedule/resources', async (req, res) => {
         }
 
         const query = `
-            WITH resource_count AS (
-                SELECT COUNT(DISTINCT resource) as count
-                FROM activityanalysisview
-                WHERE activitystatus IN ('Active', 'NotStart')
-                ${projectFilter}
-            )
             SELECT 
                 activityid as "Activity ID",
                 activityname as "Activity Name",
@@ -4195,10 +4224,9 @@ app.get('/api/schedule/resources', async (req, res) => {
                 activitytype as "Activity Type",
                 activitystatus as "Activity Status",
                 resource as "Resource"
-            FROM activityanalysisview, resource_count
+            FROM activityanalysisview
             WHERE activitystatus IN ('Active', 'NotStart')
             AND resource IS NOT NULL
-            AND resource_count.count > 0
             ${projectFilter}
             ORDER BY "Activity ID"
             LIMIT $1;`;

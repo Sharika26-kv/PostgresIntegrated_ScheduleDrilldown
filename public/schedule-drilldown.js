@@ -410,7 +410,7 @@ function getKPICards(data, metric) {
         case 'fs':
             return [
                 { 
-                    title: 'Relationships', 
+                    title: 'Total Relationships', 
                     value: data.Total_FS_Count || 0, 
                     color: 'blue'
                 },
@@ -427,7 +427,7 @@ function getKPICards(data, metric) {
             ];
         case 'non-fs':
             return [
-                { title: 'Relationships', value: data.Total_Relationship_Count || 0, color: 'blue' },
+                { title: 'Total Relationships', value: data.Total_Relationship_Count || 0, color: 'blue' },
                 { title: 'Remaining Relationships', value: data.Remaining_Count || 0, color: 'red' },
                 { title: 'Lag Count', value: data.Lag_Count || 0, color: 'green' }
             ];
@@ -481,9 +481,9 @@ function getKPICards(data, metric) {
             ];
         case 'resources':
             return [
-                { title: 'Resource Load Count', value: data.resourceload_count || 0, color: 'black' },
-                { title: 'Remaining Activities', value: data.remaining_activities || 0, color: 'black' },
-                { title: 'Resource Load %', value: (parseFloat(data.resource_load_percentage || 0)).toFixed(1) + '%', color: 'black' }
+                { title: 'Resource Load Count', value: data.ResourceLoad_Count || 0, color: 'black' },
+                { title: 'Remaining Activities', value: data.Remaining_Activities || 0, color: 'black' },
+                { title: 'Resource Load %', value: (parseFloat(data.Resource_Load_Percentage || 0)).toFixed(1) + '%', color: 'black' }
             ];
         default:
             return [];

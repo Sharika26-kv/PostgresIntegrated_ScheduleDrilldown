@@ -3,41 +3,68 @@ const db = require('../config/database');
 // Get resources KPI data
 async function getResourcesKPI(req, res) {
     const projectId = req.query.project_id;
+    console.log(`🚀 RESOURCES KPI ENDPOINT CALLED - DEBUG TEST`);
     console.log(`📊 Fetching resources KPI data for project: ${projectId}`);
     
-    let query = `
-        WITH resource_stats AS (
+    const params = [];
+    let projectFilter = '';
+    
+    console.log('🔍 Starting Resources KPI calculation...');
+    
+    if (projectId && projectId !== 'all') {
+        projectFilter = 'WHERE projectid = $1';
+        params.push(projectId);
+    }
+
+    // Get Resource Load Count and Remaining Activities using activityanalysisview
+    console.log('🔍 Building query with projectFilter:', projectFilter);
+    
+    const query = `
+        WITH metrics AS (
             SELECT 
-                -- Count distinct resources assigned to tasks
-                COUNT(DISTINCT tr.rsrc_id)::integer as ResourceLoad_Count,
-                -- Count remaining activities (not complete)
-                COUNT(DISTINCT CASE 
-                    WHEN t.status_code != 'TK_Complete' 
-                    THEN t.task_id 
-                    END)::integer as Remaining_Activities
-            FROM task t
-            LEFT JOIN taskrsrc tr ON tr.task_id = t.task_id
-            WHERE 1=1
-            ${projectId ? 'AND t.proj_id = $1' : ''}
+                COUNT(*) FILTER (
+                    WHERE activitystatus IN ('Active', 'NotStart')
+                    AND resource IS NOT NULL 
+                    AND resource != ''
+                    AND resource != ' '
+                ) as resource_load_count,
+                COUNT(*) FILTER (
+                    WHERE activitystatus != 'Complete'
+                ) as remaining_activities
+            FROM activityanalysisview
+            ${projectFilter}
         )
         SELECT 
-            ResourceLoad_Count,
-            Remaining_Activities,
+            resource_load_count as "ResourceLoad_Count",
+            remaining_activities as "Remaining_Activities",
             CASE 
-                WHEN Remaining_Activities > 0 
-                THEN TRUNC((ResourceLoad_Count::numeric / Remaining_Activities::numeric) * 100, 2)
-                ELSE 0 
-            END as Resource_Load_Percentage
-        FROM resource_stats
-    `;
+                WHEN remaining_activities = 0 THEN 0 
+                ELSE TRUNC((resource_load_count::numeric / remaining_activities::numeric) * 100, 1)
+            END as "Resource_Load_Percentage"
+        FROM metrics;`;
+
+    console.log('🔍 About to execute query...');
+    console.log('Executing query:', query);
+    console.log('Query parameters:', params);
     
     try {
-        const result = await db.query(query, projectId ? [projectId] : []);
-        res.json(result.rows[0] || {
-            ResourceLoad_Count: 0,
-            Remaining_Activities: 0,
-            Resource_Load_Percentage: 0
-        });
+        const result = await db.query(query, params);
+        console.log('Query executed successfully');
+        console.log('Query result:', result.rows[0]);
+        
+        // Debug: Check if we're getting the expected data
+        if (!result.rows[0]) {
+            console.log('No data returned from query');
+            res.json({
+                ResourceLoad_Count: 0,
+                Remaining_Activities: 0,
+                Resource_Load_Percentage: 0
+            });
+            return;
+        }
+        
+        console.log('Sending response:', result.rows[0]);
+        res.json(result.rows[0]);
     } catch (err) {
         console.error('❌ Error fetching resources KPI:', err);
         res.status(500).json({ error: err.message });
@@ -78,39 +105,31 @@ async function getResourcesPercentageHistory(req, res) {
     const projectId = req.query.project_id;
     console.log(`📊 Fetching resources percentage history for project: ${projectId}`);
     
+    const params = [];
+    let projectFilter = '';
+    
+    if (projectId && projectId !== 'all') {
+        projectFilter = 'WHERE projectid = $1';
+        params.push(projectId);
+    }
+    
     const query = `
-        WITH project_dates AS (
-            SELECT 
-                p.proj_id,
-                p.last_recalc_date::timestamp as date
-            FROM project p
-            WHERE ${projectId ? 'p.proj_id = $1' : '1=1'}
-        ),
-        daily_stats AS (
-            SELECT 
-                pd.date,
-                pd.proj_id,
-                -- Count distinct resources assigned to tasks
-                COUNT(DISTINCT tr.rsrc_id)::integer as resource_count,
-                -- Count remaining activities (not complete)
-                COUNT(DISTINCT CASE WHEN t.status_code != 'Completed' THEN t.task_id END)::integer as remaining_activities
-            FROM project_dates pd
-            LEFT JOIN task t ON t.proj_id = pd.proj_id
-            LEFT JOIN taskrsrc tr ON tr.task_id = t.task_id
-            GROUP BY pd.date, pd.proj_id
-        )
-        SELECT 
-            TO_CHAR(date::timestamp, 'YYYY-MM') as date,
+        SELECT
+            TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM') as date,
             CASE 
-                WHEN remaining_activities = 0 THEN 0
-                ELSE TRUNC((resource_count::numeric / remaining_activities::numeric) * 100, 2)
+                WHEN COUNT(CASE WHEN a.activitystatus != 'Complete' THEN 1 END) = 0 THEN 0
+                ELSE TRUNC((COUNT(CASE WHEN a.activitystatus IN ('Active', 'NotStart') AND a.resource IS NOT NULL AND a.resource != '' AND a.resource != ' ' THEN 1 END)::numeric / 
+                          COUNT(CASE WHEN a.activitystatus != 'Complete' THEN 1 END)::numeric) * 100, 1)
             END as value
-        FROM daily_stats
+        FROM activityanalysisview a
+        LEFT JOIN project p ON p.proj_id = a.projectid
+        ${projectFilter}
+        GROUP BY p.last_recalc_date
         ORDER BY date ASC;
     `;
 
     try {
-        const result = await db.query(query, projectId ? [projectId] : []);
+        const result = await db.query(query, params);
         res.json(result.rows);
     } catch (error) {
         console.error('Error fetching resources percentage history:', error);
