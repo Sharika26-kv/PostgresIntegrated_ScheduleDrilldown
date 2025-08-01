@@ -435,7 +435,7 @@ function getKPICards(data, metric) {
             return [
                 { title: 'Open End Count', value: data.Open_End_Count || 0, color: 'teal' },
                 { title: 'Permissible Open Ends', value: data.Permissible_Open_Ends || 2, color: 'green' },
-                { title: 'Remaining Activities', value: data.Remaining_Activities || 0, color: 'blue' }
+                { title: 'Open Ends %', value: (data.Open_End_Percentage || 0).toFixed(2) + '%', color: 'blue' }
             ];
         case 'constraints':
             return [
