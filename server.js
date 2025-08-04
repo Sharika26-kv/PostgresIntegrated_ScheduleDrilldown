@@ -2454,11 +2454,10 @@ app.get('/api/schedule/non-fs-percentage-history', async (req, res) => {
         let query = `
             SELECT
                 TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM') as date,
-                COUNT(CASE WHEN a.relationship_type != 'PR_FS' OR a.lag != '0' THEN 1 END) * 100.0 / 
-                NULLIF(COUNT(*), 0) as percentage
+                COUNT(CASE WHEN a.relationship_type NOT IN ('PR_FS', 'PR_FS1') AND CAST(a.lag AS INTEGER) != 0 THEN 1 END) * 100.0 / 
+                NULLIF(COUNT(CASE WHEN a.relationship_status = 'Incomplete' THEN 1 END), 0) as percentage
             FROM activity_relationship_view a
             INNER JOIN project p ON a.project_id = p.proj_id
-            WHERE a.relationship_status = 'Incomplete'
         `;
         
         const params = [];
