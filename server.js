@@ -362,10 +362,10 @@ app.get('/api/gantt/projects/:projectId/dependencies', ganttApi.getProjectDepend
 app.get('/api/gantt/projects/:projectId/resources', ganttApi.getProjectResources);
 
 // Register Schedule API routes
-app.get('/api/schedule/resources-kpi', scheduleApi.getResourcesKPI);
-app.get('/api/schedule/resources-chart-data', scheduleApi.getResourcesChartData);
-app.get('/api/schedule/resources-percentage-history', scheduleApi.getResourcesPercentageHistory);
-app.get('/api/schedule/resources', scheduleApi.getResourcesTableData);
+// app.get('/api/schedule/resources-kpi', scheduleApi.getResourcesKPI); // Commented out to use the new implementation
+// app.get('/api/schedule/resources-chart-data', scheduleApi.getResourcesChartData); // Commented out to use the new implementation
+// app.get('/api/schedule/resources-percentage-history', scheduleApi.getResourcesPercentageHistory); // Commented out to use the new implementation
+// app.get('/api/schedule/resources', scheduleApi.getResourcesTableData); // Commented out to use the new implementation
 
 // AWP-specific endpoints
 app.get('/api/awp/projects/:projectId/hierarchy', ganttApi.getAWPHierarchy);
@@ -1354,28 +1354,116 @@ app.get('/api/schedule/leads-kpi', async (req, res) => {
     const logPrefix = '[Server /api/schedule/leads-kpi]';
     try {
         const projectId = req.query.project_id;
+        const relationshipType = req.query.relationship_type;
+        const lag = req.query.lag;
+        const freeFloat = req.query.free_float;
+        const driving = req.query.driving;
+        
+        // Build filters for leads count
+        let leadsFilters = [
+            "relationship_status = 'Incomplete'",
+            "CAST(lag AS REAL) < 0"
+        ];
+        const leadsParams = [];
+        let leadsParamIndex = 1;
+        
+        if (projectId && projectId !== 'all') {
+            leadsFilters.push(`project_id = $${leadsParamIndex}`);
+            leadsParams.push(projectId);
+            leadsParamIndex++;
+        }
+        
+        // Add relationship type filter
+        if (relationshipType && relationshipType !== '') {
+            leadsFilters.push(`relationship_type = $${leadsParamIndex}`);
+            leadsParams.push(relationshipType);
+            leadsParamIndex++;
+        }
+        
+        // Add lag filter
+        if (lag && lag !== '') {
+            leadsFilters.push(`lag = $${leadsParamIndex}`);
+            leadsParams.push(lag);
+            leadsParamIndex++;
+        }
+        
+        // Add free float filter
+        if (freeFloat && freeFloat !== '') {
+            leadsFilters.push(`free_float = $${leadsParamIndex}`);
+            leadsParams.push(freeFloat);
+            leadsParamIndex++;
+        }
+        
+        // Add driving filter
+        if (driving && driving !== '') {
+            leadsFilters.push(`driving = $${leadsParamIndex}`);
+            leadsParams.push(driving);
+            leadsParamIndex++;
+        }
+        
+        const leadsWhereClause = leadsFilters.length > 0 ? 'WHERE ' + leadsFilters.join(' AND ') : '';
         
         // Query for leads count (with lag < 0 and incomplete status)
         const leadsQuery = `
             SELECT COUNT(*) as leads_count 
             FROM activity_relationship_view 
-            WHERE relationship_status = 'Incomplete' 
-            AND CAST(lag AS REAL) < 0
-        ` + (projectId && projectId !== 'all' ? ` AND project_id = $1` : '');
+            ${leadsWhereClause}
+        `;
+        
+        // Build filters for remaining count
+        let remainingFilters = ["relationship_status = 'Incomplete'"];
+        const remainingParams = [];
+        let remainingParamIndex = 1;
+        
+        if (projectId && projectId !== 'all') {
+            remainingFilters.push(`project_id = $${remainingParamIndex}`);
+            remainingParams.push(projectId);
+            remainingParamIndex++;
+        }
+        
+        // Add the same filters for remaining count
+        if (relationshipType && relationshipType !== '') {
+            remainingFilters.push(`relationship_type = $${remainingParamIndex}`);
+            remainingParams.push(relationshipType);
+            remainingParamIndex++;
+        }
+        
+        if (lag && lag !== '') {
+            remainingFilters.push(`lag = $${remainingParamIndex}`);
+            remainingParams.push(lag);
+            remainingParamIndex++;
+        }
+        
+        if (freeFloat && freeFloat !== '') {
+            remainingFilters.push(`free_float = $${remainingParamIndex}`);
+            remainingParams.push(freeFloat);
+            remainingParamIndex++;
+        }
+        
+        if (driving && driving !== '') {
+            remainingFilters.push(`driving = $${remainingParamIndex}`);
+            remainingParams.push(driving);
+            remainingParamIndex++;
+        }
+        
+        const remainingWhereClause = remainingFilters.length > 0 ? 'WHERE ' + remainingFilters.join(' AND ') : '';
         
         // Query for remaining count (only incomplete status)
         const remainingQuery = `
             SELECT COUNT(*) as remaining_count 
             FROM activity_relationship_view 
-            WHERE relationship_status = 'Incomplete'
-        ` + (projectId && projectId !== 'all' ? ` AND project_id = $1` : '');
+            ${remainingWhereClause}
+        `;
         
-        const params = projectId && projectId !== 'all' ? [projectId] : [];
+        console.log('[Leads KPI] Leads Query:', leadsQuery);
+        console.log('[Leads KPI] Leads Params:', leadsParams);
+        console.log('[Leads KPI] Remaining Query:', remainingQuery);
+        console.log('[Leads KPI] Remaining Params:', remainingParams);
         
         // Get leads count and remaining relationships count
         const [leadsResult, remainingResult] = await Promise.all([
-            db.query(leadsQuery, params),
-            db.query(remainingQuery, params)
+            db.query(leadsQuery, leadsParams),
+            db.query(remainingQuery, remainingParams)
         ]);
         
         const leadsCount = parseInt(leadsResult.rows[0]?.leads_count || 0);
@@ -1398,6 +1486,10 @@ app.get('/api/schedule/leads-chart-data', async (req, res) => {
     const logPrefix = '[Server /api/schedule/leads-chart-data]';
     try {
         const projectId = req.query.project_id;
+        const relationshipType = req.query.relationship_type;
+        const lag = req.query.lag;
+        const freeFloat = req.query.free_float;
+        const driving = req.query.driving;
         
         // Use PostgreSQL leads chart query from migration script
         let query = `
@@ -1410,12 +1502,46 @@ app.get('/api/schedule/leads-chart-data', async (req, res) => {
         `;
         
         const params = [];
+        let paramIndex = 1;
+        
         if (projectId && projectId !== 'all') {
-            query += ` AND project_id = $1`;
+            query += ` AND project_id = $${paramIndex}`;
             params.push(projectId);
+            paramIndex++;
+        }
+        
+        // Add relationship type filter
+        if (relationshipType && relationshipType !== '') {
+            query += ` AND relationship_type = $${paramIndex}`;
+            params.push(relationshipType);
+            paramIndex++;
+        }
+        
+        // Add lag filter
+        if (lag && lag !== '') {
+            query += ` AND lag = $${paramIndex}`;
+            params.push(lag);
+            paramIndex++;
+        }
+        
+        // Add free float filter
+        if (freeFloat && freeFloat !== '') {
+            query += ` AND free_float = $${paramIndex}`;
+            params.push(freeFloat);
+            paramIndex++;
+        }
+        
+        // Add driving filter
+        if (driving && driving !== '') {
+            query += ` AND driving = $${paramIndex}`;
+            params.push(driving);
+            paramIndex++;
         }
         
         query += ` GROUP BY lag, relationship_type ORDER BY lag, relationship_type`;
+        
+        console.log('[Leads Chart] Query:', query);
+        console.log('[Leads Chart] Params:', params);
         
         const result = await db.query(query, params);
         res.json(result.rows);
@@ -1430,6 +1556,10 @@ app.get('/api/schedule/leads-percentage-history', async (req, res) => {
     const logPrefix = '[Server /api/schedule/leads-percentage-history]';
     try {
         const projectId = req.query.project_id;
+        const relationshipType = req.query.relationship_type;
+        const lag = req.query.lag;
+        const freeFloat = req.query.free_float;
+        const driving = req.query.driving;
         
         // Calculate leads percentage history directly from activity_relationship_view
         let query = `
@@ -1444,12 +1574,46 @@ app.get('/api/schedule/leads-percentage-history', async (req, res) => {
         `;
         
         const params = [];
+        let paramIndex = 1;
+        
         if (projectId && projectId !== 'all') {
-            query += ` AND a.project_id = $1`;
+            query += ` AND a.project_id = $${paramIndex}`;
             params.push(projectId);
+            paramIndex++;
+        }
+        
+        // Add relationship type filter
+        if (relationshipType && relationshipType !== '') {
+            query += ` AND a.relationship_type = $${paramIndex}`;
+            params.push(relationshipType);
+            paramIndex++;
+        }
+        
+        // Add lag filter
+        if (lag && lag !== '') {
+            query += ` AND a.lag = $${paramIndex}`;
+            params.push(lag);
+            paramIndex++;
+        }
+        
+        // Add free float filter
+        if (freeFloat && freeFloat !== '') {
+            query += ` AND a.free_float = $${paramIndex}`;
+            params.push(freeFloat);
+            paramIndex++;
+        }
+        
+        // Add driving filter
+        if (driving && driving !== '') {
+            query += ` AND a.driving = $${paramIndex}`;
+            params.push(driving);
+            paramIndex++;
         }
         
         query += ` GROUP BY TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM'), p.proj_id ORDER BY date, project_id`;
+
+        console.log('[Leads History] Query:', query);
+        console.log('[Leads History] Params:', params);
 
         const result = await db.query(query, params);
 
@@ -1471,6 +1635,10 @@ app.get('/api/schedule/leads', async (req, res) => {
     const logPrefix = '[Server /api/schedule/leads]';
     try {
         const projectId = req.query.project_id;
+        const relationshipType = req.query.relationship_type;
+        const lag = req.query.lag;
+        const freeFloat = req.query.free_float;
+        const driving = req.query.driving;
         const limit = req.query.limit || 20;
         
         // Query for leads table data with correct filters
@@ -1493,13 +1661,47 @@ app.get('/api/schedule/leads', async (req, res) => {
         `;
         
         const params = [];
+        let paramIndex = 1;
+        
         if (projectId && projectId !== 'all') {
-            query += ` AND project_id = $1`;
+            query += ` AND project_id = $${paramIndex}`;
             params.push(projectId);
+            paramIndex++;
         }
         
-        query += ` ORDER BY CAST(lag AS REAL) ASC LIMIT $${params.length + 1}`;
+        // Add relationship type filter
+        if (relationshipType && relationshipType !== '') {
+            query += ` AND relationship_type = $${paramIndex}`;
+            params.push(relationshipType);
+            paramIndex++;
+        }
+        
+        // Add lag filter
+        if (lag && lag !== '') {
+            query += ` AND lag = $${paramIndex}`;
+            params.push(lag);
+            paramIndex++;
+        }
+        
+        // Add free float filter
+        if (freeFloat && freeFloat !== '') {
+            query += ` AND free_float = $${paramIndex}`;
+            params.push(freeFloat);
+            paramIndex++;
+        }
+        
+        // Add driving filter
+        if (driving && driving !== '') {
+            query += ` AND driving = $${paramIndex}`;
+            params.push(driving);
+            paramIndex++;
+        }
+        
+        query += ` ORDER BY CAST(lag AS REAL) ASC LIMIT $${paramIndex}`;
         params.push(parseInt(limit));
+        
+        console.log('[Leads Table] Query:', query);
+        console.log('[Leads Table] Params:', params);
         
         const result = await db.query(query, params);
         res.json(result.rows);
@@ -1513,27 +1715,115 @@ app.get('/api/schedule/leads', async (req, res) => {
 app.get('/api/schedule/lags-kpi', async (req, res) => {
     try {
         const projectId = req.query.project_id;
+        const relationshipType = req.query.relationship_type;
+        const lag = req.query.lag;
+        const freeFloat = req.query.free_float;
+        const driving = req.query.driving;
+        
+        // Build filters for lags count
+        let lagsFilters = [
+            "relationship_status = 'Incomplete'",
+            "CAST(lag AS REAL) > 0"
+        ];
+        const lagsParams = [];
+        let lagsParamIndex = 1;
+        
+        if (projectId && projectId !== 'all') {
+            lagsFilters.push(`project_id = $${lagsParamIndex}`);
+            lagsParams.push(projectId);
+            lagsParamIndex++;
+        }
+        
+        // Add relationship type filter
+        if (relationshipType && relationshipType !== '') {
+            lagsFilters.push(`relationship_type = $${lagsParamIndex}`);
+            lagsParams.push(relationshipType);
+            lagsParamIndex++;
+        }
+        
+        // Add lag filter
+        if (lag && lag !== '') {
+            lagsFilters.push(`lag = $${lagsParamIndex}`);
+            lagsParams.push(lag);
+            lagsParamIndex++;
+        }
+        
+        // Add free float filter
+        if (freeFloat && freeFloat !== '') {
+            lagsFilters.push(`free_float = $${lagsParamIndex}`);
+            lagsParams.push(freeFloat);
+            lagsParamIndex++;
+        }
+        
+        // Add driving filter
+        if (driving && driving !== '') {
+            lagsFilters.push(`driving = $${lagsParamIndex}`);
+            lagsParams.push(driving);
+            lagsParamIndex++;
+        }
+        
+        const lagsWhereClause = lagsFilters.length > 0 ? 'WHERE ' + lagsFilters.join(' AND ') : '';
         
         // Query for lag count (with lag > 0 and incomplete status)
         const lagsQuery = `
             SELECT COUNT(*) as lags_count 
             FROM activity_relationship_view 
-            WHERE relationship_status = 'Incomplete' 
-            AND CAST(lag AS REAL) > 0
-        ` + (projectId && projectId !== 'all' ? ` AND project_id = $1` : '');
+            ${lagsWhereClause}
+        `;
+        
+        // Build filters for remaining count
+        let remainingFilters = ["relationship_status = 'Incomplete'"];
+        const remainingParams = [];
+        let remainingParamIndex = 1;
+        
+        if (projectId && projectId !== 'all') {
+            remainingFilters.push(`project_id = $${remainingParamIndex}`);
+            remainingParams.push(projectId);
+            remainingParamIndex++;
+        }
+        
+        // Add the same filters for remaining count
+        if (relationshipType && relationshipType !== '') {
+            remainingFilters.push(`relationship_type = $${remainingParamIndex}`);
+            remainingParams.push(relationshipType);
+            remainingParamIndex++;
+        }
+        
+        if (lag && lag !== '') {
+            remainingFilters.push(`lag = $${remainingParamIndex}`);
+            remainingParams.push(lag);
+            remainingParamIndex++;
+        }
+        
+        if (freeFloat && freeFloat !== '') {
+            remainingFilters.push(`free_float = $${remainingParamIndex}`);
+            remainingParams.push(freeFloat);
+            remainingParamIndex++;
+        }
+        
+        if (driving && driving !== '') {
+            remainingFilters.push(`driving = $${remainingParamIndex}`);
+            remainingParams.push(driving);
+            remainingParamIndex++;
+        }
+        
+        const remainingWhereClause = remainingFilters.length > 0 ? 'WHERE ' + remainingFilters.join(' AND ') : '';
         
         // Query for remaining count (only incomplete status)
         const remainingQuery = `
             SELECT COUNT(*) as remaining_count 
             FROM activity_relationship_view 
-            WHERE relationship_status = 'Incomplete'
-        ` + (projectId && projectId !== 'all' ? ` AND project_id = $1` : '');
+            ${remainingWhereClause}
+        `;
         
-        const queryParams = projectId && projectId !== 'all' ? [projectId] : [];
+        console.log('[Lags KPI] Lags Query:', lagsQuery);
+        console.log('[Lags KPI] Lags Params:', lagsParams);
+        console.log('[Lags KPI] Remaining Query:', remainingQuery);
+        console.log('[Lags KPI] Remaining Params:', remainingParams);
         
         const [result, remainingResult] = await Promise.all([
-            db.query(lagsQuery, queryParams),
-            db.query(remainingQuery, queryParams)
+            db.query(lagsQuery, lagsParams),
+            db.query(remainingQuery, remainingParams)
         ]);
         
         const lagsCount = parseInt(result.rows[0]?.lags_count || 0);
@@ -1555,6 +1845,10 @@ app.get('/api/schedule/lags-kpi', async (req, res) => {
 app.get('/api/schedule/lags-chart-data', async (req, res) => {
     try {
         const projectId = req.query.project_id;
+        const relationshipType = req.query.relationship_type;
+        const lag = req.query.lag;
+        const freeFloat = req.query.free_float;
+        const driving = req.query.driving;
         
         // Use PostgreSQL lags chart query from migration script
         let query = `
@@ -1567,12 +1861,46 @@ app.get('/api/schedule/lags-chart-data', async (req, res) => {
         `;
         
         const params = [];
+        let paramIndex = 1;
+        
         if (projectId && projectId !== 'all') {
-            query += ` AND project_id = $1`;
+            query += ` AND project_id = $${paramIndex}`;
             params.push(projectId);
+            paramIndex++;
+        }
+        
+        // Add relationship type filter
+        if (relationshipType && relationshipType !== '') {
+            query += ` AND relationship_type = $${paramIndex}`;
+            params.push(relationshipType);
+            paramIndex++;
+        }
+        
+        // Add lag filter
+        if (lag && lag !== '') {
+            query += ` AND lag = $${paramIndex}`;
+            params.push(lag);
+            paramIndex++;
+        }
+        
+        // Add free float filter
+        if (freeFloat && freeFloat !== '') {
+            query += ` AND free_float = $${paramIndex}`;
+            params.push(freeFloat);
+            paramIndex++;
+        }
+        
+        // Add driving filter
+        if (driving && driving !== '') {
+            query += ` AND driving = $${paramIndex}`;
+            params.push(driving);
+            paramIndex++;
         }
         
         query += ` GROUP BY lag, relationship_type ORDER BY lag, relationship_type`;
+        
+        console.log('[Lags Chart] Query:', query);
+        console.log('[Lags Chart] Params:', params);
         
         const result = await db.query(query, params);
         const rows = result.rows;
@@ -1588,6 +1916,10 @@ app.get('/api/schedule/lags-chart-data', async (req, res) => {
 app.get('/api/schedule/lags-percentage-history', async (req, res) => {
     try {
         const projectId = req.query.project_id;
+        const relationshipType = req.query.relationship_type;
+        const lag = req.query.lag;
+        const freeFloat = req.query.free_float;
+        const driving = req.query.driving;
         
         // Calculate lags percentage history directly from activity_relationship_view
         let query = `
@@ -1602,12 +1934,46 @@ app.get('/api/schedule/lags-percentage-history', async (req, res) => {
         `;
         
         const params = [];
+        let paramIndex = 1;
+        
         if (projectId && projectId !== 'all') {
-            query += ` AND a.project_id = $1`;
+            query += ` AND a.project_id = $${paramIndex}`;
             params.push(projectId);
+            paramIndex++;
+        }
+        
+        // Add relationship type filter
+        if (relationshipType && relationshipType !== '') {
+            query += ` AND a.relationship_type = $${paramIndex}`;
+            params.push(relationshipType);
+            paramIndex++;
+        }
+        
+        // Add lag filter
+        if (lag && lag !== '') {
+            query += ` AND a.lag = $${paramIndex}`;
+            params.push(lag);
+            paramIndex++;
+        }
+        
+        // Add free float filter
+        if (freeFloat && freeFloat !== '') {
+            query += ` AND a.free_float = $${paramIndex}`;
+            params.push(freeFloat);
+            paramIndex++;
+        }
+        
+        // Add driving filter
+        if (driving && driving !== '') {
+            query += ` AND a.driving = $${paramIndex}`;
+            params.push(driving);
+            paramIndex++;
         }
         
         query += ` GROUP BY TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM'), p.proj_id ORDER BY date, project_id`;
+
+        console.log('[Lags History] Query:', query);
+        console.log('[Lags History] Params:', params);
 
         const result = await db.query(query, params);
 
@@ -1628,6 +1994,10 @@ app.get('/api/schedule/lags-percentage-history', async (req, res) => {
 app.get('/api/schedule/lags', async (req, res) => {
     try {
         const projectId = req.query.project_id;
+        const relationshipType = req.query.relationship_type;
+        const lag = req.query.lag;
+        const freeFloat = req.query.free_float;
+        const driving = req.query.driving;
         const limit = req.query.limit || 20;
         
         // Query for lags table data with correct filters
@@ -1650,13 +2020,47 @@ app.get('/api/schedule/lags', async (req, res) => {
         `;
         
         const params = [];
+        let paramIndex = 1;
+        
         if (projectId && projectId !== 'all') {
-            query += ` AND project_id = $1`;
+            query += ` AND project_id = $${paramIndex}`;
             params.push(projectId);
+            paramIndex++;
         }
         
-        query += ` ORDER BY CAST(lag AS REAL) DESC LIMIT $${params.length + 1}`;
+        // Add relationship type filter
+        if (relationshipType && relationshipType !== '') {
+            query += ` AND relationship_type = $${paramIndex}`;
+            params.push(relationshipType);
+            paramIndex++;
+        }
+        
+        // Add lag filter
+        if (lag && lag !== '') {
+            query += ` AND lag = $${paramIndex}`;
+            params.push(lag);
+            paramIndex++;
+        }
+        
+        // Add free float filter
+        if (freeFloat && freeFloat !== '') {
+            query += ` AND free_float = $${paramIndex}`;
+            params.push(freeFloat);
+            paramIndex++;
+        }
+        
+        // Add driving filter
+        if (driving && driving !== '') {
+            query += ` AND driving = $${paramIndex}`;
+            params.push(driving);
+            paramIndex++;
+        }
+        
+        query += ` ORDER BY CAST(lag AS REAL) DESC LIMIT $${paramIndex}`;
         params.push(parseInt(limit));
+        
+        console.log('[Lags Table] Query:', query);
+        console.log('[Lags Table] Params:', params);
         
         const result = await db.query(query, params);
         res.json(result.rows);
@@ -1670,28 +2074,116 @@ app.get('/api/schedule/lags', async (req, res) => {
 app.get('/api/schedule/excessive-lags-kpi', async (req, res) => {
     try {
         const projectId = req.query.project_id;
+        const relationshipType = req.query.relationship_type;
+        const lag = req.query.lag;
+        const freeFloat = req.query.free_float;
+        const driving = req.query.driving;
+        
+        // Build filters for excessive lags count
+        let excessiveLagsFilters = [
+            "relationship_status = 'Incomplete'",
+            "excessive_lag = 'Excessive Lag'",
+            "CAST(lag AS REAL) > 0"
+        ];
+        const excessiveLagsParams = [];
+        let excessiveLagsParamIndex = 1;
+        
+        if (projectId && projectId !== 'all') {
+            excessiveLagsFilters.push(`project_id = $${excessiveLagsParamIndex}`);
+            excessiveLagsParams.push(projectId);
+            excessiveLagsParamIndex++;
+        }
+        
+        // Add relationship type filter
+        if (relationshipType && relationshipType !== '') {
+            excessiveLagsFilters.push(`relationship_type = $${excessiveLagsParamIndex}`);
+            excessiveLagsParams.push(relationshipType);
+            excessiveLagsParamIndex++;
+        }
+        
+        // Add lag filter
+        if (lag && lag !== '') {
+            excessiveLagsFilters.push(`lag = $${excessiveLagsParamIndex}`);
+            excessiveLagsParams.push(lag);
+            excessiveLagsParamIndex++;
+        }
+        
+        // Add free float filter
+        if (freeFloat && freeFloat !== '') {
+            excessiveLagsFilters.push(`free_float = $${excessiveLagsParamIndex}`);
+            excessiveLagsParams.push(freeFloat);
+            excessiveLagsParamIndex++;
+        }
+        
+        // Add driving filter
+        if (driving && driving !== '') {
+            excessiveLagsFilters.push(`driving = $${excessiveLagsParamIndex}`);
+            excessiveLagsParams.push(driving);
+            excessiveLagsParamIndex++;
+        }
+        
+        const excessiveLagsWhereClause = excessiveLagsFilters.length > 0 ? 'WHERE ' + excessiveLagsFilters.join(' AND ') : '';
         
         // Query for excessive lag count (with excessive_lag = "Excessive Lag" and incomplete status)
         const excessiveLagsQuery = `
             SELECT COUNT(*) as excessive_lags_count 
             FROM activity_relationship_view 
-            WHERE relationship_status = 'Incomplete' 
-            AND excessive_lag = 'Excessive Lag'
-            AND CAST(lag AS REAL) > 0
-        ` + (projectId && projectId !== 'all' ? ` AND project_id = $1` : '');
+            ${excessiveLagsWhereClause}
+        `;
+        
+        // Build filters for remaining count
+        let remainingFilters = ["relationship_status = 'Incomplete'"];
+        const remainingParams = [];
+        let remainingParamIndex = 1;
+        
+        if (projectId && projectId !== 'all') {
+            remainingFilters.push(`project_id = $${remainingParamIndex}`);
+            remainingParams.push(projectId);
+            remainingParamIndex++;
+        }
+        
+        // Add the same filters for remaining count
+        if (relationshipType && relationshipType !== '') {
+            remainingFilters.push(`relationship_type = $${remainingParamIndex}`);
+            remainingParams.push(relationshipType);
+            remainingParamIndex++;
+        }
+        
+        if (lag && lag !== '') {
+            remainingFilters.push(`lag = $${remainingParamIndex}`);
+            remainingParams.push(lag);
+            remainingParamIndex++;
+        }
+        
+        if (freeFloat && freeFloat !== '') {
+            remainingFilters.push(`free_float = $${remainingParamIndex}`);
+            remainingParams.push(freeFloat);
+            remainingParamIndex++;
+        }
+        
+        if (driving && driving !== '') {
+            remainingFilters.push(`driving = $${remainingParamIndex}`);
+            remainingParams.push(driving);
+            remainingParamIndex++;
+        }
+        
+        const remainingWhereClause = remainingFilters.length > 0 ? 'WHERE ' + remainingFilters.join(' AND ') : '';
         
         // Query for remaining count (only incomplete status)
         const remainingQuery = `
             SELECT COUNT(*) as remaining_count 
             FROM activity_relationship_view 
-            WHERE relationship_status = 'Incomplete'
-        ` + (projectId && projectId !== 'all' ? ` AND project_id = $1` : '');
+            ${remainingWhereClause}
+        `;
         
-        const queryParams = projectId && projectId !== 'all' ? [projectId] : [];
+        console.log('[Excessive Lags KPI] Excessive Lags Query:', excessiveLagsQuery);
+        console.log('[Excessive Lags KPI] Excessive Lags Params:', excessiveLagsParams);
+        console.log('[Excessive Lags KPI] Remaining Query:', remainingQuery);
+        console.log('[Excessive Lags KPI] Remaining Params:', remainingParams);
         
         const [result, remainingResult] = await Promise.all([
-            db.query(excessiveLagsQuery, queryParams),
-            db.query(remainingQuery, queryParams)
+            db.query(excessiveLagsQuery, excessiveLagsParams),
+            db.query(remainingQuery, remainingParams)
         ]);
         
         const excessiveLagsCount = parseInt(result.rows[0]?.excessive_lags_count || 0);
@@ -1762,27 +2254,64 @@ app.get('/api/schedule/excessive-lags-count', async (req, res) => {
 app.get('/api/schedule/excessive-lags-chart-data', async (req, res) => {
     try {
         const projectId = req.query.project_id;
+        const relationshipType = req.query.relationship_type;
+        const lag = req.query.lag;
+        const freeFloat = req.query.free_float;
+        const driving = req.query.driving;
         
-        let filters = ["relationship_status = 'Incomplete'", "excessive_lag > '0'"];
+        let filters = ["relationship_status = 'Incomplete'", "excessive_lag = 'Excessive Lag'", "CAST(lag AS REAL) > 0"];
         const params = [];
+        let paramIndex = 1;
         
         if (projectId && projectId !== 'all') {
-            filters.push('project_id = $1');
+            filters.push(`project_id = $${paramIndex}`);
             params.push(projectId);
+            paramIndex++;
+        }
+        
+        // Add relationship type filter
+        if (relationshipType && relationshipType !== '') {
+            filters.push(`relationship_type = $${paramIndex}`);
+            params.push(relationshipType);
+            paramIndex++;
+        }
+        
+        // Add lag filter
+        if (lag && lag !== '') {
+            filters.push(`lag = $${paramIndex}`);
+            params.push(lag);
+            paramIndex++;
+        }
+        
+        // Add free float filter
+        if (freeFloat && freeFloat !== '') {
+            filters.push(`free_float = $${paramIndex}`);
+            params.push(freeFloat);
+            paramIndex++;
+        }
+        
+        // Add driving filter
+        if (driving && driving !== '') {
+            filters.push(`driving = $${paramIndex}`);
+            params.push(driving);
+            paramIndex++;
         }
         
         const whereClause = filters.length > 0 ? 'WHERE ' + filters.join(' AND ') : '';
         
         const query = `
             SELECT 
-                excessive_lag as lag,
-                relationship_type as relationship_type,
+                lag,
+                relationship_type,
                 COUNT(*) as count
             FROM activity_relationship_view 
             ${whereClause}
-            GROUP BY excessive_lag, relationship_type
-            ORDER BY excessive_lag, relationship_type
+            GROUP BY lag, relationship_type
+            ORDER BY lag, relationship_type
         `;
+        
+        console.log('[Excessive Lags Chart] Query:', query);
+        console.log('[Excessive Lags Chart] Params:', params);
         
         const result = await db.query(query, params);
         const rows = result.rows;
@@ -1798,6 +2327,10 @@ app.get('/api/schedule/excessive-lags-chart-data', async (req, res) => {
 app.get('/api/schedule/excessive-lags', async (req, res) => {
     try {
         const projectId = req.query.project_id;
+        const relationshipType = req.query.relationship_type;
+        const lag = req.query.lag;
+        const freeFloat = req.query.free_float;
+        const driving = req.query.driving;
         const limit = req.query.limit || 20;
         
         // Query for excessive lags table data with correct filters
@@ -1821,13 +2354,47 @@ app.get('/api/schedule/excessive-lags', async (req, res) => {
         `;
         
         const params = [];
+        let paramIndex = 1;
+        
         if (projectId && projectId !== 'all') {
-            query += ` AND project_id = $1`;
+            query += ` AND project_id = $${paramIndex}`;
             params.push(projectId);
+            paramIndex++;
         }
         
-        query += ` ORDER BY CAST(lag AS REAL) DESC LIMIT $${params.length + 1}`;
+        // Add relationship type filter
+        if (relationshipType && relationshipType !== '') {
+            query += ` AND relationship_type = $${paramIndex}`;
+            params.push(relationshipType);
+            paramIndex++;
+        }
+        
+        // Add lag filter
+        if (lag && lag !== '') {
+            query += ` AND lag = $${paramIndex}`;
+            params.push(lag);
+            paramIndex++;
+        }
+        
+        // Add free float filter
+        if (freeFloat && freeFloat !== '') {
+            query += ` AND free_float = $${paramIndex}`;
+            params.push(freeFloat);
+            paramIndex++;
+        }
+        
+        // Add driving filter
+        if (driving && driving !== '') {
+            query += ` AND driving = $${paramIndex}`;
+            params.push(driving);
+            paramIndex++;
+        }
+        
+        query += ` ORDER BY CAST(lag AS REAL) DESC LIMIT $${paramIndex}`;
         params.push(parseInt(limit));
+        
+        console.log('[Excessive Lags Table] Query:', query);
+        console.log('[Excessive Lags Table] Params:', params);
         
         const result = await db.query(query, params);
         res.json(result.rows);
@@ -1841,18 +2408,55 @@ app.get('/api/schedule/excessive-lags', async (req, res) => {
 app.get('/api/schedule/fs-kpi', async (req, res) => {
     try {
         const projectId = req.query.project_id;
+        const relationshipType = req.query.relationship_type;
+        const lag = req.query.lag;
+        const freeFloat = req.query.free_float;
+        const driving = req.query.driving;
         
         let filters = ["relationship_status = 'Incomplete'", "relationship_type = 'PR_FS'", "lag = '0'"];
         const params = [];
+        let paramIndex = 1;
         
         if (projectId && projectId !== 'all') {
-            filters.push('project_id = $1');
+            filters.push(`project_id = $${paramIndex}`);
             params.push(projectId);
+            paramIndex++;
+        }
+        
+        // Add relationship type filter
+        if (relationshipType && relationshipType !== '') {
+            filters.push(`relationship_type = $${paramIndex}`);
+            params.push(relationshipType);
+            paramIndex++;
+        }
+        
+        // Add lag filter
+        if (lag && lag !== '') {
+            filters.push(`lag = $${paramIndex}`);
+            params.push(lag);
+            paramIndex++;
+        }
+        
+        // Add free float filter
+        if (freeFloat && freeFloat !== '') {
+            filters.push(`free_float = $${paramIndex}`);
+            params.push(freeFloat);
+            paramIndex++;
+        }
+        
+        // Add driving filter
+        if (driving && driving !== '') {
+            filters.push(`driving = $${paramIndex}`);
+            params.push(driving);
+            paramIndex++;
         }
         
         const whereClause = filters.length > 0 ? 'WHERE ' + filters.join(' AND ') : '';
         
         const query = `SELECT COUNT(*) as fs_count FROM activity_relationship_view ${whereClause}`;
+        
+        console.log('[FS KPI] Query:', query);
+        console.log('[FS KPI] Params:', params);
         
         const queryResult = await db.query(query, params);
         const result = queryResult.rows[0] || {  fs_count: 0  };
@@ -1860,10 +2464,39 @@ app.get('/api/schedule/fs-kpi', async (req, res) => {
         // Get remaining relationships for percentage calculation
         let remainingFilters = ["relationship_status = 'Incomplete'"];
         const remainingParams = [];
+        let remainingParamIndex = 1;
+        
         if (projectId && projectId !== 'all') {
-            remainingFilters.push('project_id = $1');
+            remainingFilters.push(`project_id = $${remainingParamIndex}`);
             remainingParams.push(projectId);
+            remainingParamIndex++;
         }
+        
+        // Add the same filters for remaining count
+        if (relationshipType && relationshipType !== '') {
+            remainingFilters.push(`relationship_type = $${remainingParamIndex}`);
+            remainingParams.push(relationshipType);
+            remainingParamIndex++;
+        }
+        
+        if (lag && lag !== '') {
+            remainingFilters.push(`lag = $${remainingParamIndex}`);
+            remainingParams.push(lag);
+            remainingParamIndex++;
+        }
+        
+        if (freeFloat && freeFloat !== '') {
+            remainingFilters.push(`free_float = $${remainingParamIndex}`);
+            remainingParams.push(freeFloat);
+            remainingParamIndex++;
+        }
+        
+        if (driving && driving !== '') {
+            remainingFilters.push(`driving = $${remainingParamIndex}`);
+            remainingParams.push(driving);
+            remainingParamIndex++;
+        }
+        
         const remainingWhere = remainingFilters.length > 0 ? 'WHERE ' + remainingFilters.join(' AND ') : '';
         
         const remainingQuery = `SELECT COUNT(*) as remaining_count FROM activity_relationship_view ${remainingWhere}`;
@@ -1890,18 +2523,55 @@ app.get('/api/schedule/fs-kpi', async (req, res) => {
 app.get('/api/schedule/non-fs-kpi', async (req, res) => {
     try {
         const projectId = req.query.project_id;
+        const relationshipType = req.query.relationship_type;
+        const lag = req.query.lag;
+        const freeFloat = req.query.free_float;
+        const driving = req.query.driving;
         
         let filters = ["relationship_status = 'Incomplete'", "(relationship_type != 'PR_FS' OR lag != '0')"];
         const params = [];
+        let paramIndex = 1;
         
         if (projectId && projectId !== 'all') {
-            filters.push('project_id = $1');
+            filters.push(`project_id = $${paramIndex}`);
             params.push(projectId);
+            paramIndex++;
+        }
+        
+        // Add relationship type filter
+        if (relationshipType && relationshipType !== '') {
+            filters.push(`relationship_type = $${paramIndex}`);
+            params.push(relationshipType);
+            paramIndex++;
+        }
+        
+        // Add lag filter
+        if (lag && lag !== '') {
+            filters.push(`lag = $${paramIndex}`);
+            params.push(lag);
+            paramIndex++;
+        }
+        
+        // Add free float filter
+        if (freeFloat && freeFloat !== '') {
+            filters.push(`free_float = $${paramIndex}`);
+            params.push(freeFloat);
+            paramIndex++;
+        }
+        
+        // Add driving filter
+        if (driving && driving !== '') {
+            filters.push(`driving = $${paramIndex}`);
+            params.push(driving);
+            paramIndex++;
         }
         
         const whereClause = filters.length > 0 ? 'WHERE ' + filters.join(' AND ') : '';
         
         const query = `SELECT COUNT(*) as non_fs_count FROM activity_relationship_view ${whereClause}`;
+        
+        console.log('[Non-FS KPI] Query:', query);
+        console.log('[Non-FS KPI] Params:', params);
         
         const queryResult = await db.query(query, params);
         const result = queryResult.rows[0] || {  non_fs_count: 0  };
@@ -1909,10 +2579,39 @@ app.get('/api/schedule/non-fs-kpi', async (req, res) => {
         // Get remaining relationships for percentage calculation
         let remainingFilters = ["relationship_status = 'Incomplete'"];
         const remainingParams = [];
+        let remainingParamIndex = 1;
+        
         if (projectId && projectId !== 'all') {
-            remainingFilters.push('project_id = $1');
+            remainingFilters.push(`project_id = $${remainingParamIndex}`);
             remainingParams.push(projectId);
+            remainingParamIndex++;
         }
+        
+        // Add the same filters for remaining count
+        if (relationshipType && relationshipType !== '') {
+            remainingFilters.push(`relationship_type = $${remainingParamIndex}`);
+            remainingParams.push(relationshipType);
+            remainingParamIndex++;
+        }
+        
+        if (lag && lag !== '') {
+            remainingFilters.push(`lag = $${remainingParamIndex}`);
+            remainingParams.push(lag);
+            remainingParamIndex++;
+        }
+        
+        if (freeFloat && freeFloat !== '') {
+            remainingFilters.push(`free_float = $${remainingParamIndex}`);
+            remainingParams.push(freeFloat);
+            remainingParamIndex++;
+        }
+        
+        if (driving && driving !== '') {
+            remainingFilters.push(`driving = $${remainingParamIndex}`);
+            remainingParams.push(driving);
+            remainingParamIndex++;
+        }
+        
         const remainingWhere = remainingFilters.length > 0 ? 'WHERE ' + remainingFilters.join(' AND ') : '';
         
         const remainingQuery = `SELECT COUNT(*) as remaining_count FROM activity_relationship_view ${remainingWhere}`;
@@ -1939,6 +2638,10 @@ app.get('/api/schedule/non-fs-kpi', async (req, res) => {
 app.get('/api/schedule/fs-chart-data', async (req, res) => {
     try {
         const projectId = req.query.project_id;
+        const relationshipType = req.query.relationship_type;
+        const lag = req.query.lag;
+        const freeFloat = req.query.free_float;
+        const driving = req.query.driving;
         
         let filters = [
             "relationship_status = 'Incomplete'",
@@ -1946,10 +2649,40 @@ app.get('/api/schedule/fs-chart-data', async (req, res) => {
             "lag = '0'"
         ];
         const params = [];
+        let paramIndex = 1;
         
         if (projectId && projectId !== 'all') {
-            filters.push('project_id = $1');
+            filters.push(`project_id = $${paramIndex}`);
             params.push(projectId);
+            paramIndex++;
+        }
+        
+        // Add relationship type filter
+        if (relationshipType && relationshipType !== '') {
+            filters.push(`relationship_type = $${paramIndex}`);
+            params.push(relationshipType);
+            paramIndex++;
+        }
+        
+        // Add lag filter
+        if (lag && lag !== '') {
+            filters.push(`lag = $${paramIndex}`);
+            params.push(lag);
+            paramIndex++;
+        }
+        
+        // Add free float filter
+        if (freeFloat && freeFloat !== '') {
+            filters.push(`free_float = $${paramIndex}`);
+            params.push(freeFloat);
+            paramIndex++;
+        }
+        
+        // Add driving filter
+        if (driving && driving !== '') {
+            filters.push(`driving = $${paramIndex}`);
+            params.push(driving);
+            paramIndex++;
         }
         
         const whereClause = filters.length > 0 ? 'WHERE ' + filters.join(' AND ') : '';
@@ -1963,6 +2696,9 @@ app.get('/api/schedule/fs-chart-data', async (req, res) => {
             GROUP BY relationship_type
             ORDER BY relationship_type
         `;
+        
+        console.log('[FS Chart] Query:', query);
+        console.log('[FS Chart] Params:', params);
         
         const result = await db.query(query, params);
         const rows = result.rows;
@@ -1978,6 +2714,10 @@ app.get('/api/schedule/fs-chart-data', async (req, res) => {
 app.get('/api/schedule/non-fs-chart-data', async (req, res) => {
     try {
         const projectId = req.query.project_id;
+        const relationshipType = req.query.relationship_type;
+        const lag = req.query.lag;
+        const freeFloat = req.query.free_float;
+        const driving = req.query.driving;
         
         let filters = [
             "relationship_status = 'Incomplete'",
@@ -1985,10 +2725,40 @@ app.get('/api/schedule/non-fs-chart-data', async (req, res) => {
             "CAST(lag AS INTEGER) != 0"
         ];
         const params = [];
+        let paramIndex = 1;
         
         if (projectId && projectId !== 'all') {
-            filters.push('project_id = $1');
+            filters.push(`project_id = $${paramIndex}`);
             params.push(projectId);
+            paramIndex++;
+        }
+        
+        // Add relationship type filter
+        if (relationshipType && relationshipType !== '') {
+            filters.push(`relationship_type = $${paramIndex}`);
+            params.push(relationshipType);
+            paramIndex++;
+        }
+        
+        // Add lag filter
+        if (lag && lag !== '') {
+            filters.push(`lag = $${paramIndex}`);
+            params.push(lag);
+            paramIndex++;
+        }
+        
+        // Add free float filter
+        if (freeFloat && freeFloat !== '') {
+            filters.push(`free_float = $${paramIndex}`);
+            params.push(freeFloat);
+            paramIndex++;
+        }
+        
+        // Add driving filter
+        if (driving && driving !== '') {
+            filters.push(`driving = $${paramIndex}`);
+            params.push(driving);
+            paramIndex++;
         }
         
         const whereClause = filters.length > 0 ? 'WHERE ' + filters.join(' AND ') : '';
@@ -2002,6 +2772,9 @@ app.get('/api/schedule/non-fs-chart-data', async (req, res) => {
             GROUP BY relationship_type
             ORDER BY relationship_type
         `;
+        
+        console.log('[Non-FS Chart] Query:', query);
+        console.log('[Non-FS Chart] Params:', params);
         
         const result = await db.query(query, params);
         const rows = result.rows;
@@ -2069,14 +2842,48 @@ app.get('/api/schedule/relationship-metrics', async (req, res) => {
 app.get('/api/schedule/fs', async (req, res) => {
     try {
         const projectId = req.query.project_id;
+        const relationshipType = req.query.relationship_type;
+        const lag = req.query.lag;
+        const freeFloat = req.query.free_float;
+        const driving = req.query.driving;
         const limit = req.query.limit || 20;
         
         let filters = ["relationship_status = 'Incomplete'", "relationship_type = 'PR_FS'", "lag = '0'"];
         const params = [];
+        let paramIndex = 1;
         
         if (projectId && projectId !== 'all') {
-            filters.push('project_id = $1');
+            filters.push(`project_id = $${paramIndex}`);
             params.push(projectId);
+            paramIndex++;
+        }
+        
+        // Add relationship type filter
+        if (relationshipType && relationshipType !== '') {
+            filters.push(`relationship_type = $${paramIndex}`);
+            params.push(relationshipType);
+            paramIndex++;
+        }
+        
+        // Add lag filter
+        if (lag && lag !== '') {
+            filters.push(`lag = $${paramIndex}`);
+            params.push(lag);
+            paramIndex++;
+        }
+        
+        // Add free float filter
+        if (freeFloat && freeFloat !== '') {
+            filters.push(`free_float = $${paramIndex}`);
+            params.push(freeFloat);
+            paramIndex++;
+        }
+        
+        // Add driving filter
+        if (driving && driving !== '') {
+            filters.push(`driving = $${paramIndex}`);
+            params.push(driving);
+            paramIndex++;
         }
         
         const whereClause = filters.length > 0 ? 'WHERE ' + filters.join(' AND ') : '';
@@ -2097,10 +2904,13 @@ app.get('/api/schedule/fs', async (req, res) => {
             FROM activity_relationship_view
             ${whereClause}
             ORDER BY activity_id
-            LIMIT $${params.length + 1}
+            LIMIT $${paramIndex}
         `;
         
         params.push(parseInt(limit));
+        
+        console.log('[FS Table] Query:', query);
+        console.log('[FS Table] Params:', params);
         
         const result = await db.query(query, params);
         const rows = result.rows;
@@ -2170,6 +2980,10 @@ app.get('/api/schedule/non-fs-relationship-metrics', async (req, res) => {
 app.get('/api/schedule/non-fs', async (req, res) => {
     try {
         const projectId = req.query.project_id;
+        const relationshipType = req.query.relationship_type;
+        const lag = req.query.lag;
+        const freeFloat = req.query.free_float;
+        const driving = req.query.driving;
         const limit = req.query.limit || 20;
         
         let filters = [
@@ -2178,10 +2992,40 @@ app.get('/api/schedule/non-fs', async (req, res) => {
             "CAST(lag AS INTEGER) != 0"
         ];
         const params = [];
+        let paramIndex = 1;
         
         if (projectId && projectId !== 'all') {
-            filters.push('project_id = $1');
+            filters.push(`project_id = $${paramIndex}`);
             params.push(projectId);
+            paramIndex++;
+        }
+        
+        // Add relationship type filter
+        if (relationshipType && relationshipType !== '') {
+            filters.push(`relationship_type = $${paramIndex}`);
+            params.push(relationshipType);
+            paramIndex++;
+        }
+        
+        // Add lag filter
+        if (lag && lag !== '') {
+            filters.push(`lag = $${paramIndex}`);
+            params.push(lag);
+            paramIndex++;
+        }
+        
+        // Add free float filter
+        if (freeFloat && freeFloat !== '') {
+            filters.push(`free_float = $${paramIndex}`);
+            params.push(freeFloat);
+            paramIndex++;
+        }
+        
+        // Add driving filter
+        if (driving && driving !== '') {
+            filters.push(`driving = $${paramIndex}`);
+            params.push(driving);
+            paramIndex++;
         }
         
         const whereClause = filters.length > 0 ? 'WHERE ' + filters.join(' AND ') : '';
@@ -2202,10 +3046,13 @@ app.get('/api/schedule/non-fs', async (req, res) => {
             FROM activity_relationship_view
             ${whereClause}
             ORDER BY activity_id
-            LIMIT $${params.length + 1}
+            LIMIT $${paramIndex}
         `;
         
         params.push(parseInt(limit));
+        
+        console.log('[Non-FS Table] Query:', query);
+        console.log('[Non-FS Table] Params:', params);
         
         const result = await db.query(query, params);
         const rows = result.rows;
@@ -2377,13 +3224,17 @@ app.get('/api/schedule/finalactivitykpi', async (req, res) => {
 app.get('/api/schedule/excessive-lags-percentage-history', async (req, res) => {
     try {
         const projectId = req.query.project_id;
+        const relationshipType = req.query.relationship_type;
+        const lag = req.query.lag;
+        const freeFloat = req.query.free_float;
+        const driving = req.query.driving;
         
         // Calculate excessive lags percentage history directly from activity_relationship_view
         let query = `
             SELECT
                 TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM') as date,
                 p.proj_id as project_id,
-                COUNT(CASE WHEN a.lag > '0' THEN 1 END) * 100.0 / 
+                COUNT(CASE WHEN a.excessive_lag = 'Excessive Lag' AND CAST(a.lag AS REAL) > 0 THEN 1 END) * 100.0 / 
                 NULLIF(COUNT(*), 0) as percentage
             FROM activity_relationship_view a
             INNER JOIN project p ON a.project_id = p.proj_id
@@ -2391,12 +3242,46 @@ app.get('/api/schedule/excessive-lags-percentage-history', async (req, res) => {
         `;
         
         const params = [];
+        let paramIndex = 1;
+        
         if (projectId && projectId !== 'all') {
-            query += ` AND a.project_id = $1`;
+            query += ` AND a.project_id = $${paramIndex}`;
             params.push(projectId);
+            paramIndex++;
+        }
+        
+        // Add relationship type filter
+        if (relationshipType && relationshipType !== '') {
+            query += ` AND a.relationship_type = $${paramIndex}`;
+            params.push(relationshipType);
+            paramIndex++;
+        }
+        
+        // Add lag filter
+        if (lag && lag !== '') {
+            query += ` AND a.lag = $${paramIndex}`;
+            params.push(lag);
+            paramIndex++;
+        }
+        
+        // Add free float filter
+        if (freeFloat && freeFloat !== '') {
+            query += ` AND a.free_float = $${paramIndex}`;
+            params.push(freeFloat);
+            paramIndex++;
+        }
+        
+        // Add driving filter
+        if (driving && driving !== '') {
+            query += ` AND a.driving = $${paramIndex}`;
+            params.push(driving);
+            paramIndex++;
         }
         
         query += ` GROUP BY TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM'), p.proj_id ORDER BY date, project_id`;
+
+        console.log('[Excessive Lags History] Query:', query);
+        console.log('[Excessive Lags History] Params:', params);
 
         const result = await db.query(query, params);
 
@@ -2415,6 +3300,10 @@ app.get('/api/schedule/excessive-lags-percentage-history', async (req, res) => {
 app.get('/api/schedule/fs-percentage-history', async (req, res) => {
     try {
         const projectId = req.query.project_id;
+        const relationshipType = req.query.relationship_type;
+        const lag = req.query.lag;
+        const freeFloat = req.query.free_float;
+        const driving = req.query.driving;
         
         // Calculate FS percentage history directly from activity_relationship_view
         let query = `
@@ -2429,12 +3318,46 @@ app.get('/api/schedule/fs-percentage-history', async (req, res) => {
         `;
         
         const params = [];
+        let paramIndex = 1;
+        
         if (projectId && projectId !== 'all') {
-            query += ` AND a.project_id = $1`;
+            query += ` AND a.project_id = $${paramIndex}`;
             params.push(projectId);
+            paramIndex++;
+        }
+        
+        // Add relationship type filter
+        if (relationshipType && relationshipType !== '') {
+            query += ` AND a.relationship_type = $${paramIndex}`;
+            params.push(relationshipType);
+            paramIndex++;
+        }
+        
+        // Add lag filter
+        if (lag && lag !== '') {
+            query += ` AND a.lag = $${paramIndex}`;
+            params.push(lag);
+            paramIndex++;
+        }
+        
+        // Add free float filter
+        if (freeFloat && freeFloat !== '') {
+            query += ` AND a.free_float = $${paramIndex}`;
+            params.push(freeFloat);
+            paramIndex++;
+        }
+        
+        // Add driving filter
+        if (driving && driving !== '') {
+            query += ` AND a.driving = $${paramIndex}`;
+            params.push(driving);
+            paramIndex++;
         }
         
         query += ` GROUP BY TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM'), p.proj_id ORDER BY date, project_id`;
+
+        console.log('[FS History] Query:', query);
+        console.log('[FS History] Params:', params);
 
         const result = await db.query(query, params);
 
@@ -2453,6 +3376,10 @@ app.get('/api/schedule/fs-percentage-history', async (req, res) => {
 app.get('/api/schedule/non-fs-percentage-history', async (req, res) => {
     try {
         const projectId = req.query.project_id;
+        const relationshipType = req.query.relationship_type;
+        const lag = req.query.lag;
+        const freeFloat = req.query.free_float;
+        const driving = req.query.driving;
         
         // Calculate Non-FS percentage history directly from activity_relationship_view
         let query = `
@@ -2466,12 +3393,46 @@ app.get('/api/schedule/non-fs-percentage-history', async (req, res) => {
         `;
         
         const params = [];
+        let paramIndex = 1;
+        
         if (projectId && projectId !== 'all') {
-            query += ` AND a.project_id = $1`;
+            query += ` AND a.project_id = $${paramIndex}`;
             params.push(projectId);
+            paramIndex++;
+        }
+        
+        // Add relationship type filter
+        if (relationshipType && relationshipType !== '') {
+            query += ` AND a.relationship_type = $${paramIndex}`;
+            params.push(relationshipType);
+            paramIndex++;
+        }
+        
+        // Add lag filter
+        if (lag && lag !== '') {
+            query += ` AND a.lag = $${paramIndex}`;
+            params.push(lag);
+            paramIndex++;
+        }
+        
+        // Add free float filter
+        if (freeFloat && freeFloat !== '') {
+            query += ` AND a.free_float = $${paramIndex}`;
+            params.push(freeFloat);
+            paramIndex++;
+        }
+        
+        // Add driving filter
+        if (driving && driving !== '') {
+            query += ` AND a.driving = $${paramIndex}`;
+            params.push(driving);
+            paramIndex++;
         }
         
         query += ` GROUP BY TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM'), p.proj_id ORDER BY date, project_id`;
+
+        console.log('[Non-FS History] Query:', query);
+        console.log('[Non-FS History] Params:', params);
 
         const result = await db.query(query, params);
 
@@ -2569,14 +3530,27 @@ app.post('/api/database/query', async (req, res) => {
 app.get('/api/schedule/open-ends-kpi', async (req, res) => {
     try {
         const projectId = req.query.project_id;
+        const activityType = req.query.activity_type;
+        const activityStatus = req.query.activity_status;
         
         // Get Open Ends count (activities with OpenEnds = 'Open End')
         let openEndFilters = ["openends = 'Open End'"];
         const openEndParams = [];
+        let paramIndex = 1;
         
         if (projectId && projectId !== 'all') {
-            openEndFilters.push('projectid = $1');
+            openEndFilters.push(`projectid = $${paramIndex++}`);
             openEndParams.push(projectId);
+        }
+        
+        if (activityType && activityType !== '') {
+            openEndFilters.push(`activitytype = $${paramIndex++}`);
+            openEndParams.push(activityType);
+        }
+        
+        if (activityStatus && activityStatus !== '') {
+            openEndFilters.push(`activitystatus = $${paramIndex++}`);
+            openEndParams.push(activityStatus);
         }
         
         const openEndWhereClause = openEndFilters.length > 0 ? 'WHERE ' + openEndFilters.join(' AND ') : '';
@@ -2588,10 +3562,21 @@ app.get('/api/schedule/open-ends-kpi', async (req, res) => {
         // Get remaining activities count (activities that are not Complete)
         let remainingFilters = ["activitystatus != 'Complete'"];
         const remainingParams = [];
+        paramIndex = 1;
         
         if (projectId && projectId !== 'all') {
-            remainingFilters.push('projectid = $1');
+            remainingFilters.push(`projectid = $${paramIndex++}`);
             remainingParams.push(projectId);
+        }
+        
+        if (activityType && activityType !== '') {
+            remainingFilters.push(`activitytype = $${paramIndex++}`);
+            remainingParams.push(activityType);
+        }
+        
+        if (activityStatus && activityStatus !== '') {
+            remainingFilters.push(`activitystatus = $${paramIndex++}`);
+            remainingParams.push(activityStatus);
         }
         
         const remainingWhereClause = remainingFilters.length > 0 ? 'WHERE ' + remainingFilters.join(' AND ') : '';
@@ -2622,13 +3607,26 @@ app.get('/api/schedule/open-ends-kpi', async (req, res) => {
 app.get('/api/schedule/open-ends-chart-data', async (req, res) => {
     try {
         const projectId = req.query.project_id;
+        const activityType = req.query.activity_type;
+        const activityStatus = req.query.activity_status;
         
         let filters = ["openends = 'Open End'"];
         const params = [];
+        let paramIndex = 1;
         
         if (projectId && projectId !== 'all') {
-            filters.push('projectid = $1');
+            filters.push(`projectid = $${paramIndex++}`);
             params.push(projectId);
+        }
+        
+        if (activityType && activityType !== '') {
+            filters.push(`activitytype = $${paramIndex++}`);
+            params.push(activityType);
+        }
+        
+        if (activityStatus && activityStatus !== '') {
+            filters.push(`activitystatus = $${paramIndex++}`);
+            params.push(activityStatus);
         }
         
         const whereClause = filters.length > 0 ? 'WHERE ' + filters.join(' AND ') : '';
@@ -2671,9 +3669,25 @@ app.get('/api/schedule/open-ends-percentage-history', async (req, res) => {
         `;
         
         const params = [];
+        let paramIndex = 1;
         if (projectId && projectId !== 'all') {
-            query += ` AND a.projectid = $1`;
+            query += ` AND a.projectid = $${paramIndex++}`;
             params.push(projectId);
+        }
+        
+        // Add filter conditions
+        const filterConditions = [];
+        if (req.query.activity_type && req.query.activity_type !== '') {
+            filterConditions.push(`a.activitytype = $${paramIndex++}`);
+            params.push(req.query.activity_type);
+        }
+        if (req.query.activity_status && req.query.activity_status !== '') {
+            filterConditions.push(`a.activitystatus = $${paramIndex++}`);
+            params.push(req.query.activity_status);
+        }
+        
+        if (filterConditions.length > 0) {
+            query += ` AND ${filterConditions.join(' AND ')}`;
         }
         
         query += ` GROUP BY TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM'), p.proj_id ORDER BY date, project_id`;
@@ -2700,10 +3714,21 @@ app.get('/api/schedule/open-ends', async (req, res) => {
         
         let filters = ["openends = 'Open End'"];
         const params = [];
+        let paramIndex = 1;
         
         if (projectId && projectId !== 'all') {
-            filters.push('projectid = $1');
+            filters.push(`projectid = $${paramIndex++}`);
             params.push(projectId);
+        }
+        
+        if (req.query.activity_type && req.query.activity_type !== '') {
+            filters.push(`activitytype = $${paramIndex++}`);
+            params.push(req.query.activity_type);
+        }
+        
+        if (req.query.activity_status && req.query.activity_status !== '') {
+            filters.push(`activitystatus = $${paramIndex++}`);
+            params.push(req.query.activity_status);
         }
         
         const whereClause = filters.length > 0 ? 'WHERE ' + filters.join(' AND ') : '';
@@ -2736,6 +3761,1371 @@ app.get('/api/schedule/open-ends', async (req, res) => {
     } catch (error) {
         console.error('[Schedule API] Error in open-ends endpoint:', error);
         res.status(500).json({ error: 'Failed to fetch Open Ends data' });
+    }
+});
+
+// Open Ends filter endpoints
+app.get('/api/schedule/open-ends-activity-type-filters', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        let query = `
+            SELECT DISTINCT activitytype as value
+            FROM activityanalysisview
+            WHERE openends = 'Open End'
+        `;
+        
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND projectid = $1`;
+            params.push(projectId);
+        }
+        
+        query += ` ORDER BY activitytype ASC`;
+        
+        const result = await db.query(query, params);
+        const values = result.rows.map(row => row.value).filter(value => value != null && value !== '');
+        
+        res.json(values);
+    } catch (error) {
+        console.error('[Schedule API] Error in open-ends-activity-type-filters endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch activity type filters' });
+    }
+});
+
+app.get('/api/schedule/open-ends-activity-status-filters', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        let query = `
+            SELECT DISTINCT activitystatus as value
+            FROM activityanalysisview
+            WHERE openends = 'Open End'
+        `;
+        
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND projectid = $1`;
+            params.push(projectId);
+        }
+        
+        query += ` ORDER BY activitystatus ASC`;
+        
+        const result = await db.query(query, params);
+        const values = result.rows.map(row => row.value).filter(value => value != null && value !== '');
+        
+        res.json(values);
+    } catch (error) {
+        console.error('[Schedule API] Error in open-ends-activity-status-filters endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch activity status filters' });
+    }
+});
+
+// Constraints filter endpoints
+app.get('/api/schedule/constraints-activity-type-filters', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        let query = `
+            SELECT DISTINCT activitytype as value
+            FROM activityanalysisview
+            WHERE primaryconstraint IN ('CS_MSO','CS_MSOB','CS_MSOA','CS_MEO','CS_MEOB','CS_MEOA','CS_ALAP')
+            AND activitystatus != 'Complete'
+        `;
+        
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND projectid = $1`;
+            params.push(projectId);
+        }
+        
+        query += ` ORDER BY activitytype ASC`;
+        
+        const result = await db.query(query, params);
+        const values = result.rows.map(row => row.value).filter(value => value != null && value !== '');
+        
+        res.json(values);
+    } catch (error) {
+        console.error('[Schedule API] Error in constraints-activity-type-filters endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch activity type filters' });
+    }
+});
+
+app.get('/api/schedule/constraints-activity-status-filters', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        let query = `
+            SELECT DISTINCT activitystatus as value
+            FROM activityanalysisview
+            WHERE primaryconstraint IN ('CS_MSO','CS_MSOB','CS_MSOA','CS_MEO','CS_MEOB','CS_MEOA','CS_ALAP')
+            AND activitystatus != 'Complete'
+        `;
+        
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND projectid = $1`;
+            params.push(projectId);
+        }
+        
+        query += ` ORDER BY activitystatus ASC`;
+        
+        const result = await db.query(query, params);
+        const values = result.rows.map(row => row.value).filter(value => value != null && value !== '');
+        
+        res.json(values);
+    } catch (error) {
+        console.error('[Schedule API] Error in constraints-activity-status-filters endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch activity status filters' });
+    }
+});
+
+// Excessive Durations filter endpoints
+app.get('/api/schedule/excessive-durations-activity-type-filters', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        let query = `
+            SELECT DISTINCT activitytype as value
+            FROM activityanalysisview
+            WHERE CAST(originalduration AS INTEGER) > 20
+            AND activitystatus IN ('Active', 'NotStart')
+        `;
+        
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND projectid = $1`;
+            params.push(projectId);
+        }
+        
+        query += ` ORDER BY activitytype ASC`;
+        
+        console.log('[Excessive Durations] Activity Type Filter Query:', query);
+        console.log('[Excessive Durations] Activity Type Filter Params:', params);
+        
+        const result = await db.query(query, params);
+        console.log('[Excessive Durations] Activity Type Filter Raw Result:', result.rows);
+        
+        const values = result.rows.map(row => row.value).filter(value => value != null && value !== '');
+        console.log('[Excessive Durations] Activity Type Filter Final Values:', values);
+        
+        res.json(values);
+    } catch (error) {
+        console.error('[Schedule API] Error in excessive-durations-activity-type-filters endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch activity type filters' });
+    }
+});
+
+app.get('/api/schedule/excessive-durations-activity-status-filters', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        let query = `
+            SELECT DISTINCT activitystatus as value
+            FROM activityanalysisview
+            WHERE CAST(originalduration AS INTEGER) > 20
+            AND activitystatus IN ('Active', 'NotStart')
+        `;
+        
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND projectid = $1`;
+            params.push(projectId);
+        }
+        
+        query += ` ORDER BY activitystatus ASC`;
+        
+        console.log('[Excessive Durations] Activity Status Filter Query:', query);
+        console.log('[Excessive Durations] Activity Status Filter Params:', params);
+        
+        const result = await db.query(query, params);
+        console.log('[Excessive Durations] Activity Status Filter Raw Result:', result.rows);
+        
+        const values = result.rows.map(row => row.value).filter(value => value != null && value !== '');
+        console.log('[Excessive Durations] Activity Status Filter Final Values:', values);
+        
+        res.json(values);
+    } catch (error) {
+        console.error('[Schedule API] Error in excessive-durations-activity-status-filters endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch activity status filters' });
+    }
+});
+
+// Negative Total Float filter endpoints
+app.get('/api/schedule/negative-float-activity-type-filters', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        let query = `
+            SELECT DISTINCT activitytype as value
+            FROM activityanalysisview
+            WHERE totalfloatdays < 0
+            AND activitystatus IN ('Active', 'NotStart')
+        `;
+        
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND projectid = $1`;
+            params.push(projectId);
+        }
+        
+        query += ` ORDER BY activitytype ASC`;
+        
+        console.log('[Negative Total Float] Activity Type Filter Query:', query);
+        console.log('[Negative Total Float] Activity Type Filter Params:', params);
+        
+        const result = await db.query(query, params);
+        console.log('[Negative Total Float] Activity Type Filter Raw Result:', result.rows);
+        
+        const values = result.rows.map(row => row.value).filter(value => value != null && value !== '');
+        console.log('[Negative Total Float] Activity Type Filter Final Values:', values);
+        
+        res.json(values);
+    } catch (error) {
+        console.error('[Schedule API] Error in negative-float-activity-type-filters endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch activity type filters' });
+    }
+});
+
+app.get('/api/schedule/negative-float-activity-status-filters', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        let query = `
+            SELECT DISTINCT activitystatus as value
+            FROM activityanalysisview
+            WHERE totalfloatdays < 0
+            AND activitystatus IN ('Active', 'NotStart')
+        `;
+        
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND projectid = $1`;
+            params.push(projectId);
+        }
+        
+        query += ` ORDER BY activitystatus ASC`;
+        
+        console.log('[Negative Total Float] Activity Status Filter Query:', query);
+        console.log('[Negative Total Float] Activity Status Filter Params:', params);
+        
+        const result = await db.query(query, params);
+        console.log('[Negative Total Float] Activity Status Filter Raw Result:', result.rows);
+        
+        const values = result.rows.map(row => row.value).filter(value => value != null && value !== '');
+        console.log('[Negative Total Float] Activity Status Filter Final Values:', values);
+        
+        res.json(values);
+    } catch (error) {
+        console.error('[Schedule API] Error in negative-float-activity-status-filters endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch activity status filters' });
+    }
+});
+
+// Critical Total Float filter endpoints
+app.get('/api/schedule/critical-float-activity-type-filters', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        let query = `
+            SELECT DISTINCT activitytype as value
+            FROM activityanalysisview
+            WHERE totalfloatdays >= 0 AND totalfloatdays <= 15
+            AND activitystatus IN ('Active', 'NotStart')
+        `;
+        
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND projectid = $1`;
+            params.push(projectId);
+        }
+        
+        query += ` ORDER BY activitytype ASC`;
+        
+        console.log('[Critical Total Float] Activity Type Filter Query:', query);
+        console.log('[Critical Total Float] Activity Type Filter Params:', params);
+        
+        const result = await db.query(query, params);
+        console.log('[Critical Total Float] Activity Type Filter Raw Result:', result.rows);
+        
+        const values = result.rows.map(row => row.value).filter(value => value != null && value !== '');
+        console.log('[Critical Total Float] Activity Type Filter Final Values:', values);
+        
+        res.json(values);
+    } catch (error) {
+        console.error('[Schedule API] Error in critical-float-activity-type-filters endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch activity type filters' });
+    }
+});
+
+app.get('/api/schedule/critical-float-activity-status-filters', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        let query = `
+            SELECT DISTINCT activitystatus as value
+            FROM activityanalysisview
+            WHERE totalfloatdays >= 0 AND totalfloatdays <= 15
+            AND activitystatus IN ('Active', 'NotStart')
+        `;
+        
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND projectid = $1`;
+            params.push(projectId);
+        }
+        
+        query += ` ORDER BY activitystatus ASC`;
+        
+        console.log('[Critical Total Float] Activity Status Filter Query:', query);
+        console.log('[Critical Total Float] Activity Status Filter Params:', params);
+        
+        const result = await db.query(query, params);
+        console.log('[Critical Total Float] Activity Status Filter Raw Result:', result.rows);
+        
+        const values = result.rows.map(row => row.value).filter(value => value != null && value !== '');
+        console.log('[Critical Total Float] Activity Status Filter Final Values:', values);
+        
+        res.json(values);
+    } catch (error) {
+        console.error('[Schedule API] Error in critical-float-activity-status-filters endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch activity status filters' });
+    }
+});
+
+// Excessive Total Float filter endpoints
+app.get('/api/schedule/excessive-float-activity-type-filters', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        let query = `
+            SELECT DISTINCT activitytype as value
+            FROM activityanalysisview
+            WHERE totalfloatdays >= 40
+            AND activitystatus IN ('Active', 'NotStart')
+        `;
+        
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND projectid = $1`;
+            params.push(projectId);
+        }
+        
+        query += ` ORDER BY activitytype ASC`;
+        
+        console.log('[Excessive Total Float] Activity Type Filter Query:', query);
+        console.log('[Excessive Total Float] Activity Type Filter Params:', params);
+        
+        const result = await db.query(query, params);
+        console.log('[Excessive Total Float] Activity Type Filter Raw Result:', result.rows);
+        
+        const values = result.rows.map(row => row.value).filter(value => value != null && value !== '');
+        console.log('[Excessive Total Float] Activity Type Filter Final Values:', values);
+        
+        res.json(values);
+    } catch (error) {
+        console.error('[Schedule API] Error in excessive-float-activity-type-filters endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch activity type filters' });
+    }
+});
+
+app.get('/api/schedule/excessive-float-activity-status-filters', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        let query = `
+            SELECT DISTINCT activitystatus as value
+            FROM activityanalysisview
+            WHERE totalfloatdays >= 40
+            AND activitystatus IN ('Active', 'NotStart')
+        `;
+        
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND projectid = $1`;
+            params.push(projectId);
+        }
+        
+        query += ` ORDER BY activitystatus ASC`;
+        
+        console.log('[Excessive Total Float] Activity Status Filter Query:', query);
+        console.log('[Excessive Total Float] Activity Status Filter Params:', params);
+        
+        const result = await db.query(query, params);
+        console.log('[Excessive Total Float] Activity Status Filter Raw Result:', result.rows);
+        
+        const values = result.rows.map(row => row.value).filter(value => value != null && value !== '');
+        console.log('[Excessive Total Float] Activity Status Filter Final Values:', values);
+        
+        res.json(values);
+    } catch (error) {
+        console.error('[Schedule API] Error in excessive-float-activity-status-filters endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch activity status filters' });
+    }
+});
+
+// Riding Data Dates filter endpoints
+app.get('/api/schedule/riding-dates-activity-type-filters', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        let query = `
+            SELECT DISTINCT activitytype as value
+            FROM activityanalysisview
+            WHERE ridingdatadate IS NOT NULL AND ridingdatadate != ''
+            AND activitystatus IN ('Active', 'NotStart')
+        `;
+        
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND projectid = $1`;
+            params.push(projectId);
+        }
+        
+        query += ` ORDER BY activitytype ASC`;
+        
+        console.log('[Riding Data Dates] Activity Type Filter Query:', query);
+        console.log('[Riding Data Dates] Activity Type Filter Params:', params);
+        
+        const result = await db.query(query, params);
+        console.log('[Riding Data Dates] Activity Type Filter Raw Result:', result.rows);
+        
+        const values = result.rows.map(row => row.value).filter(value => value != null && value !== '');
+        console.log('[Riding Data Dates] Activity Type Filter Final Values:', values);
+        
+        res.json(values);
+    } catch (error) {
+        console.error('[Schedule API] Error in riding-dates-activity-type-filters endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch activity type filters' });
+    }
+});
+
+app.get('/api/schedule/riding-dates-activity-status-filters', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        let query = `
+            SELECT DISTINCT activitystatus as value
+            FROM activityanalysisview
+            WHERE ridingdatadate IS NOT NULL AND ridingdatadate != ''
+            AND activitystatus IN ('Active', 'NotStart')
+        `;
+        
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND projectid = $1`;
+            params.push(projectId);
+        }
+        
+        query += ` ORDER BY activitystatus ASC`;
+        
+        console.log('[Riding Data Dates] Activity Status Filter Query:', query);
+        console.log('[Riding Data Dates] Activity Status Filter Params:', params);
+        
+        const result = await db.query(query, params);
+        console.log('[Riding Data Dates] Activity Status Filter Raw Result:', result.rows);
+        
+        const values = result.rows.map(row => row.value).filter(value => value != null && value !== '');
+        console.log('[Riding Data Dates] Activity Status Filter Final Values:', values);
+        
+        res.json(values);
+    } catch (error) {
+        console.error('[Schedule API] Error in riding-dates-activity-status-filters endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch activity status filters' });
+    }
+});
+
+// Invalid Dates filter endpoints
+app.get('/api/schedule/invalid-dates-activity-type-filters', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        let query = `
+            SELECT DISTINCT activitytype as value
+            FROM activityanalysisview
+            WHERE (invalidstart = 'Invalid' OR invalidfinish = 'Invalid')
+            AND activitystatus IN ('Active', 'NotStart')
+        `;
+        
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND projectid = $1`;
+            params.push(projectId);
+        }
+        
+        query += ` ORDER BY activitytype ASC`;
+        
+        console.log('[Invalid Dates] Activity Type Filter Query:', query);
+        console.log('[Invalid Dates] Activity Type Filter Params:', params);
+        
+        const result = await db.query(query, params);
+        console.log('[Invalid Dates] Activity Type Filter Raw Result:', result.rows);
+        
+        const values = result.rows.map(row => row.value).filter(value => value != null && value !== '');
+        console.log('[Invalid Dates] Activity Type Filter Final Values:', values);
+        
+        res.json(values);
+    } catch (error) {
+        console.error('[Schedule API] Error in invalid-dates-activity-type-filters endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch activity type filters' });
+    }
+});
+
+app.get('/api/schedule/invalid-dates-activity-status-filters', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        let query = `
+            SELECT DISTINCT activitystatus as value
+            FROM activityanalysisview
+            WHERE (invalidstart = 'Invalid' OR invalidfinish = 'Invalid')
+            AND activitystatus IN ('Active', 'NotStart')
+        `;
+        
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND projectid = $1`;
+            params.push(projectId);
+        }
+        
+        query += ` ORDER BY activitystatus ASC`;
+        
+        console.log('[Invalid Dates] Activity Status Filter Query:', query);
+        console.log('[Invalid Dates] Activity Status Filter Params:', params);
+        
+        const result = await db.query(query, params);
+        console.log('[Invalid Dates] Activity Status Filter Raw Result:', result.rows);
+        
+        const values = result.rows.map(row => row.value).filter(value => value != null && value !== '');
+        console.log('[Invalid Dates] Activity Status Filter Final Values:', values);
+        
+        res.json(values);
+    } catch (error) {
+        console.error('[Schedule API] Error in invalid-dates-activity-status-filters endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch activity status filters' });
+    }
+});
+
+// Resources filter endpoints
+app.get('/api/schedule/resources-activity-type-filters', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        let query = `
+            SELECT DISTINCT activitytype as value
+            FROM activityanalysisview
+            WHERE resource IS NOT NULL AND resource != '' AND resource != ' '
+            AND activitystatus IN ('Active', 'NotStart')
+        `;
+        
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND projectid = $1`;
+            params.push(projectId);
+        }
+        
+        query += ` ORDER BY activitytype ASC`;
+        
+        console.log('[Resources] Activity Type Filter Query:', query);
+        console.log('[Resources] Activity Type Filter Params:', params);
+        
+        const result = await db.query(query, params);
+        console.log('[Resources] Activity Type Filter Raw Result:', result.rows);
+        
+        const values = result.rows.map(row => row.value).filter(value => value != null && value !== '');
+        console.log('[Resources] Activity Type Filter Final Values:', values);
+        
+        res.json(values);
+    } catch (error) {
+        console.error('[Schedule API] Error in resources-activity-type-filters endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch activity type filters' });
+    }
+});
+
+app.get('/api/schedule/resources-activity-status-filters', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        let query = `
+            SELECT DISTINCT activitystatus as value
+            FROM activityanalysisview
+            WHERE resource IS NOT NULL AND resource != '' AND resource != ' '
+            AND activitystatus IN ('Active', 'NotStart')
+        `;
+        
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND projectid = $1`;
+            params.push(projectId);
+        }
+        
+        query += ` ORDER BY activitystatus ASC`;
+        
+        console.log('[Resources] Activity Status Filter Query:', query);
+        console.log('[Resources] Activity Status Filter Params:', params);
+        
+        const result = await db.query(query, params);
+        console.log('[Resources] Activity Status Filter Raw Result:', result.rows);
+        
+        const values = result.rows.map(row => row.value).filter(value => value != null && value !== '');
+        console.log('[Resources] Activity Status Filter Final Values:', values);
+        
+        res.json(values);
+    } catch (error) {
+        console.error('[Schedule API] Error in resources-activity-status-filters endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch activity status filters' });
+    }
+});
+
+// ============================================================================
+// FS+0D LAG METRIC FILTER ENDPOINTS (based on activity_relationship_view table)
+// ============================================================================
+
+// FS Relationship Type filters endpoint
+app.get('/api/schedule/fs-relationship-type-filters', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        let query = `
+            SELECT DISTINCT relationship_type as value
+            FROM activity_relationship_view
+            WHERE relationship_status = 'Incomplete'
+            AND (relationship_type = 'PR_FS' OR relationship_type = 'PR_FS1')
+            AND lag = '0'
+        `;
+        
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND project_id = $1`;
+            params.push(projectId);
+        }
+        
+        query += ` ORDER BY relationship_type ASC`;
+        
+        console.log('[FS] Relationship Type Filter Query:', query);
+        console.log('[FS] Relationship Type Filter Params:', params);
+        
+        const result = await db.query(query, params);
+        console.log('[FS] Relationship Type Filter Raw Result:', result.rows);
+        
+        const values = result.rows.map(row => row.value).filter(value => value != null && value !== '');
+        console.log('[FS] Relationship Type Filter Final Values:', values);
+        
+        res.json(values);
+    } catch (error) {
+        console.error('[Schedule API] Error in fs-relationship-type-filters endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch relationship type filters' });
+    }
+});
+
+// FS Lag filters endpoint
+app.get('/api/schedule/fs-lag-filters', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        let query = `
+            SELECT DISTINCT lag as value
+            FROM activity_relationship_view
+            WHERE relationship_status = 'Incomplete'
+            AND (relationship_type = 'PR_FS' OR relationship_type = 'PR_FS1')
+            AND lag = '0'
+        `;
+        
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND project_id = $1`;
+            params.push(projectId);
+        }
+        
+        query += ` ORDER BY lag ASC`;
+        
+        console.log('[FS] Lag Filter Query:', query);
+        console.log('[FS] Lag Filter Params:', params);
+        
+        const result = await db.query(query, params);
+        console.log('[FS] Lag Filter Raw Result:', result.rows);
+        
+        const values = result.rows.map(row => row.value).filter(value => value != null && value !== '');
+        console.log('[FS] Lag Filter Final Values:', values);
+        
+        res.json(values);
+    } catch (error) {
+        console.error('[Schedule API] Error in fs-lag-filters endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch lag filters' });
+    }
+});
+
+// FS Free Float filters endpoint
+app.get('/api/schedule/fs-free-float-filters', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        let query = `
+            SELECT DISTINCT free_float as value
+            FROM activity_relationship_view
+            WHERE relationship_status = 'Incomplete'
+            AND (relationship_type = 'PR_FS' OR relationship_type = 'PR_FS1')
+            AND lag = '0'
+        `;
+        
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND project_id = $1`;
+            params.push(projectId);
+        }
+        
+        query += ` ORDER BY free_float ASC`;
+        
+        console.log('[FS] Free Float Filter Query:', query);
+        console.log('[FS] Free Float Filter Params:', params);
+        
+        const result = await db.query(query, params);
+        console.log('[FS] Free Float Filter Raw Result:', result.rows);
+        
+        const values = result.rows.map(row => row.value).filter(value => value != null && value !== '');
+        console.log('[FS] Free Float Filter Final Values:', values);
+        
+        res.json(values);
+    } catch (error) {
+        console.error('[Schedule API] Error in fs-free-float-filters endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch free float filters' });
+    }
+});
+
+// FS Driving filters endpoint
+app.get('/api/schedule/fs-driving-filters', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        let query = `
+            SELECT DISTINCT driving as value
+            FROM activity_relationship_view
+            WHERE relationship_status = 'Incomplete'
+            AND (relationship_type = 'PR_FS' OR relationship_type = 'PR_FS1')
+            AND lag = '0'
+        `;
+        
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND project_id = $1`;
+            params.push(projectId);
+        }
+        
+        query += ` ORDER BY driving ASC`;
+        
+        console.log('[FS] Driving Filter Query:', query);
+        console.log('[FS] Driving Filter Params:', params);
+        
+        const result = await db.query(query, params);
+        console.log('[FS] Driving Filter Raw Result:', result.rows);
+        
+        const values = result.rows.map(row => row.value).filter(value => value != null && value !== '');
+        console.log('[FS] Driving Filter Final Values:', values);
+        
+        res.json(values);
+    } catch (error) {
+        console.error('[Schedule API] Error in fs-driving-filters endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch driving filters' });
+    }
+});
+
+// ============================================================================
+// NON-FS+0D LAG METRIC FILTER ENDPOINTS (based on activity_relationship_view table)
+// ============================================================================
+
+// Non-FS Relationship Type filters endpoint
+app.get('/api/schedule/non-fs-relationship-type-filters', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        let query = `
+            SELECT DISTINCT relationship_type as value
+            FROM activity_relationship_view
+            WHERE relationship_status = 'Incomplete'
+            AND relationship_type NOT IN ('PR_FS', 'PR_FS1')
+            AND CAST(lag AS INTEGER) != 0
+        `;
+        
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND project_id = $1`;
+            params.push(projectId);
+        }
+        
+        query += ` ORDER BY relationship_type ASC`;
+        
+        console.log('[Non-FS] Relationship Type Filter Query:', query);
+        console.log('[Non-FS] Relationship Type Filter Params:', params);
+        
+        const result = await db.query(query, params);
+        console.log('[Non-FS] Relationship Type Filter Raw Result:', result.rows);
+        
+        const values = result.rows.map(row => row.value).filter(value => value != null && value !== '');
+        console.log('[Non-FS] Relationship Type Filter Final Values:', values);
+        
+        res.json(values);
+    } catch (error) {
+        console.error('[Schedule API] Error in non-fs-relationship-type-filters endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch relationship type filters' });
+    }
+});
+
+// Non-FS Lag filters endpoint
+app.get('/api/schedule/non-fs-lag-filters', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        let query = `
+            SELECT DISTINCT lag as value
+            FROM activity_relationship_view
+            WHERE relationship_status = 'Incomplete'
+            AND relationship_type NOT IN ('PR_FS', 'PR_FS1')
+            AND CAST(lag AS INTEGER) != 0
+        `;
+        
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND project_id = $1`;
+            params.push(projectId);
+        }
+        
+        query += ` ORDER BY lag ASC`;
+        
+        console.log('[Non-FS] Lag Filter Query:', query);
+        console.log('[Non-FS] Lag Filter Params:', params);
+        
+        const result = await db.query(query, params);
+        console.log('[Non-FS] Lag Filter Raw Result:', result.rows);
+        
+        const values = result.rows.map(row => row.value).filter(value => value != null && value !== '');
+        console.log('[Non-FS] Lag Filter Final Values:', values);
+        
+        res.json(values);
+    } catch (error) {
+        console.error('[Schedule API] Error in non-fs-lag-filters endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch lag filters' });
+    }
+});
+
+// Non-FS Free Float filters endpoint
+app.get('/api/schedule/non-fs-free-float-filters', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        let query = `
+            SELECT DISTINCT free_float as value
+            FROM activity_relationship_view
+            WHERE relationship_status = 'Incomplete'
+            AND relationship_type NOT IN ('PR_FS', 'PR_FS1')
+            AND CAST(lag AS INTEGER) != 0
+        `;
+        
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND project_id = $1`;
+            params.push(projectId);
+        }
+        
+        query += ` ORDER BY free_float ASC`;
+        
+        console.log('[Non-FS] Free Float Filter Query:', query);
+        console.log('[Non-FS] Free Float Filter Params:', params);
+        
+        const result = await db.query(query, params);
+        console.log('[Non-FS] Free Float Filter Raw Result:', result.rows);
+        
+        const values = result.rows.map(row => row.value).filter(value => value != null && value !== '');
+        console.log('[Non-FS] Free Float Filter Final Values:', values);
+        
+        res.json(values);
+    } catch (error) {
+        console.error('[Schedule API] Error in non-fs-free-float-filters endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch free float filters' });
+    }
+});
+
+// Non-FS Driving filters endpoint
+app.get('/api/schedule/non-fs-driving-filters', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        let query = `
+            SELECT DISTINCT driving as value
+            FROM activity_relationship_view
+            WHERE relationship_status = 'Incomplete'
+            AND relationship_type NOT IN ('PR_FS', 'PR_FS1')
+            AND CAST(lag AS INTEGER) != 0
+        `;
+        
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND project_id = $1`;
+            params.push(projectId);
+        }
+        
+        query += ` ORDER BY driving ASC`;
+        
+        console.log('[Non-FS] Driving Filter Query:', query);
+        console.log('[Non-FS] Driving Filter Params:', params);
+        
+        const result = await db.query(query, params);
+        console.log('[Non-FS] Driving Filter Raw Result:', result.rows);
+        
+        const values = result.rows.map(row => row.value).filter(value => value != null && value !== '');
+        console.log('[Non-FS] Driving Filter Final Values:', values);
+        
+        res.json(values);
+    } catch (error) {
+        console.error('[Schedule API] Error in non-fs-driving-filters endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch driving filters' });
+    }
+});
+
+// ============================================================================
+// LEADS METRIC FILTER ENDPOINTS (based on activity_relationship_view table)
+// ============================================================================
+
+// Leads Relationship Type filters endpoint
+app.get('/api/schedule/leads-relationship-type-filters', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        let query = `
+            SELECT DISTINCT relationship_type as value
+            FROM activity_relationship_view
+            WHERE relationship_status = 'Incomplete'
+            AND lead IS NOT NULL AND lead != ''
+        `;
+        
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND project_id = $1`;
+            params.push(projectId);
+        }
+        
+        query += ` ORDER BY relationship_type ASC`;
+        
+        console.log('[Leads] Relationship Type Filter Query:', query);
+        console.log('[Leads] Relationship Type Filter Params:', params);
+        
+        const result = await db.query(query, params);
+        console.log('[Leads] Relationship Type Filter Raw Result:', result.rows);
+        
+        const values = result.rows.map(row => row.value).filter(value => value != null && value !== '');
+        console.log('[Leads] Relationship Type Filter Final Values:', values);
+        
+        res.json(values);
+    } catch (error) {
+        console.error('[Schedule API] Error in leads-relationship-type-filters endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch relationship type filters' });
+    }
+});
+
+// Leads Lag filters endpoint
+app.get('/api/schedule/leads-lag-filters', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        let query = `
+            SELECT DISTINCT lag as value
+            FROM activity_relationship_view
+            WHERE relationship_status = 'Incomplete'
+            AND lead IS NOT NULL AND lead != ''
+        `;
+        
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND project_id = $1`;
+            params.push(projectId);
+        }
+        
+        query += ` ORDER BY lag ASC`;
+        
+        console.log('[Leads] Lag Filter Query:', query);
+        console.log('[Leads] Lag Filter Params:', params);
+        
+        const result = await db.query(query, params);
+        console.log('[Leads] Lag Filter Raw Result:', result.rows);
+        
+        const values = result.rows.map(row => row.value).filter(value => value != null && value !== '');
+        console.log('[Leads] Lag Filter Final Values:', values);
+        
+        res.json(values);
+    } catch (error) {
+        console.error('[Schedule API] Error in leads-lag-filters endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch lag filters' });
+    }
+});
+
+// Leads Free Float filters endpoint
+app.get('/api/schedule/leads-free-float-filters', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        let query = `
+            SELECT DISTINCT free_float as value
+            FROM activity_relationship_view
+            WHERE relationship_status = 'Incomplete'
+            AND lead IS NOT NULL AND lead != ''
+        `;
+        
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND project_id = $1`;
+            params.push(projectId);
+        }
+        
+        query += ` ORDER BY free_float ASC`;
+        
+        console.log('[Leads] Free Float Filter Query:', query);
+        console.log('[Leads] Free Float Filter Params:', params);
+        
+        const result = await db.query(query, params);
+        console.log('[Leads] Free Float Filter Raw Result:', result.rows);
+        
+        const values = result.rows.map(row => row.value).filter(value => value != null && value !== '');
+        console.log('[Leads] Free Float Filter Final Values:', values);
+        
+        res.json(values);
+    } catch (error) {
+        console.error('[Schedule API] Error in leads-free-float-filters endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch free float filters' });
+    }
+});
+
+// Leads Driving filters endpoint
+app.get('/api/schedule/leads-driving-filters', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        let query = `
+            SELECT DISTINCT driving as value
+            FROM activity_relationship_view
+            WHERE relationship_status = 'Incomplete'
+            AND lead IS NOT NULL AND lead != ''
+        `;
+        
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND project_id = $1`;
+            params.push(projectId);
+        }
+        
+        query += ` ORDER BY driving ASC`;
+        
+        console.log('[Leads] Driving Filter Query:', query);
+        console.log('[Leads] Driving Filter Params:', params);
+        
+        const result = await db.query(query, params);
+        console.log('[Leads] Driving Filter Raw Result:', result.rows);
+        
+        const values = result.rows.map(row => row.value).filter(value => value != null && value !== '');
+        console.log('[Leads] Driving Filter Final Values:', values);
+        
+        res.json(values);
+    } catch (error) {
+        console.error('[Schedule API] Error in leads-driving-filters endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch driving filters' });
+    }
+});
+
+// ============================================================================
+// LAGS METRIC FILTER ENDPOINTS (based on activity_relationship_view table)
+// ============================================================================
+
+// Lags Relationship Type filters endpoint
+app.get('/api/schedule/lags-relationship-type-filters', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        let query = `
+            SELECT DISTINCT relationship_type as value
+            FROM activity_relationship_view
+            WHERE relationship_status = 'Incomplete'
+            AND CAST(lag AS REAL) > 0
+        `;
+        
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND project_id = $1`;
+            params.push(projectId);
+        }
+        
+        query += ` ORDER BY relationship_type ASC`;
+        
+        console.log('[Lags] Relationship Type Filter Query:', query);
+        console.log('[Lags] Relationship Type Filter Params:', params);
+        
+        const result = await db.query(query, params);
+        console.log('[Lags] Relationship Type Filter Raw Result:', result.rows);
+        
+        const values = result.rows.map(row => row.value).filter(value => value != null && value !== '');
+        console.log('[Lags] Relationship Type Filter Final Values:', values);
+        
+        res.json(values);
+    } catch (error) {
+        console.error('[Schedule API] Error in lags-relationship-type-filters endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch relationship type filters' });
+    }
+});
+
+// Lags Lag filters endpoint
+app.get('/api/schedule/lags-lag-filters', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        let query = `
+            SELECT DISTINCT lag as value
+            FROM activity_relationship_view
+            WHERE relationship_status = 'Incomplete'
+            AND CAST(lag AS REAL) > 0
+        `;
+        
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND project_id = $1`;
+            params.push(projectId);
+        }
+        
+        query += ` ORDER BY lag ASC`;
+        
+        console.log('[Lags] Lag Filter Query:', query);
+        console.log('[Lags] Lag Filter Params:', params);
+        
+        const result = await db.query(query, params);
+        console.log('[Lags] Lag Filter Raw Result:', result.rows);
+        
+        const values = result.rows.map(row => row.value).filter(value => value != null && value !== '');
+        console.log('[Lags] Lag Filter Final Values:', values);
+        
+        res.json(values);
+    } catch (error) {
+        console.error('[Schedule API] Error in lags-lag-filters endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch lag filters' });
+    }
+});
+
+// Lags Free Float filters endpoint
+app.get('/api/schedule/lags-free-float-filters', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        let query = `
+            SELECT DISTINCT free_float as value
+            FROM activity_relationship_view
+            WHERE relationship_status = 'Incomplete'
+            AND CAST(lag AS REAL) > 0
+        `;
+        
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND project_id = $1`;
+            params.push(projectId);
+        }
+        
+        query += ` ORDER BY free_float ASC`;
+        
+        console.log('[Lags] Free Float Filter Query:', query);
+        console.log('[Lags] Free Float Filter Params:', params);
+        
+        const result = await db.query(query, params);
+        console.log('[Lags] Free Float Filter Raw Result:', result.rows);
+        
+        const values = result.rows.map(row => row.value).filter(value => value != null && value !== '');
+        console.log('[Lags] Free Float Filter Final Values:', values);
+        
+        res.json(values);
+    } catch (error) {
+        console.error('[Schedule API] Error in lags-free-float-filters endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch free float filters' });
+    }
+});
+
+// Lags Driving filters endpoint
+app.get('/api/schedule/lags-driving-filters', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        let query = `
+            SELECT DISTINCT driving as value
+            FROM activity_relationship_view
+            WHERE relationship_status = 'Incomplete'
+            AND CAST(lag AS REAL) > 0
+        `;
+        
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND project_id = $1`;
+            params.push(projectId);
+        }
+        
+        query += ` ORDER BY driving ASC`;
+        
+        console.log('[Lags] Driving Filter Query:', query);
+        console.log('[Lags] Driving Filter Params:', params);
+        
+        const result = await db.query(query, params);
+        console.log('[Lags] Driving Filter Raw Result:', result.rows);
+        
+        const values = result.rows.map(row => row.value).filter(value => value != null && value !== '');
+        console.log('[Lags] Driving Filter Final Values:', values);
+        
+        res.json(values);
+    } catch (error) {
+        console.error('[Schedule API] Error in lags-driving-filters endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch driving filters' });
+    }
+});
+
+// ============================================================================
+// EXCESSIVE LAGS METRIC FILTER ENDPOINTS (based on activity_relationship_view table)
+// ============================================================================
+
+// Excessive Lags Relationship Type filters endpoint
+app.get('/api/schedule/excessive-lags-relationship-type-filters', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        let query = `
+            SELECT DISTINCT relationship_type as value
+            FROM activity_relationship_view
+            WHERE relationship_status = 'Incomplete'
+            AND excessive_lag = 'Excessive Lag'
+            AND CAST(lag AS REAL) > 0
+        `;
+        
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND project_id = $1`;
+            params.push(projectId);
+        }
+        
+        query += ` ORDER BY relationship_type ASC`;
+        
+        console.log('[Excessive Lags] Relationship Type Filter Query:', query);
+        console.log('[Excessive Lags] Relationship Type Filter Params:', params);
+        
+        const result = await db.query(query, params);
+        console.log('[Excessive Lags] Relationship Type Filter Raw Result:', result.rows);
+        
+        const values = result.rows.map(row => row.value).filter(value => value != null && value !== '');
+        console.log('[Excessive Lags] Relationship Type Filter Final Values:', values);
+        
+        res.json(values);
+    } catch (error) {
+        console.error('[Schedule API] Error in excessive-lags-relationship-type-filters endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch relationship type filters' });
+    }
+});
+
+// Excessive Lags Lag filters endpoint
+app.get('/api/schedule/excessive-lags-lag-filters', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        let query = `
+            SELECT DISTINCT lag as value
+            FROM activity_relationship_view
+            WHERE relationship_status = 'Incomplete'
+            AND excessive_lag = 'Excessive Lag'
+            AND CAST(lag AS REAL) > 0
+        `;
+        
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND project_id = $1`;
+            params.push(projectId);
+        }
+        
+        query += ` ORDER BY lag ASC`;
+        
+        console.log('[Excessive Lags] Lag Filter Query:', query);
+        console.log('[Excessive Lags] Lag Filter Params:', params);
+        
+        const result = await db.query(query, params);
+        console.log('[Excessive Lags] Lag Filter Raw Result:', result.rows);
+        
+        const values = result.rows.map(row => row.value).filter(value => value != null && value !== '');
+        console.log('[Excessive Lags] Lag Filter Final Values:', values);
+        
+        res.json(values);
+    } catch (error) {
+        console.error('[Schedule API] Error in excessive-lags-lag-filters endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch lag filters' });
+    }
+});
+
+// Excessive Lags Free Float filters endpoint
+app.get('/api/schedule/excessive-lags-free-float-filters', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        let query = `
+            SELECT DISTINCT free_float as value
+            FROM activity_relationship_view
+            WHERE relationship_status = 'Incomplete'
+            AND excessive_lag = 'Excessive Lag'
+            AND CAST(lag AS REAL) > 0
+        `;
+        
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND project_id = $1`;
+            params.push(projectId);
+        }
+        
+        query += ` ORDER BY free_float ASC`;
+        
+        console.log('[Excessive Lags] Free Float Filter Query:', query);
+        console.log('[Excessive Lags] Free Float Filter Params:', params);
+        
+        const result = await db.query(query, params);
+        console.log('[Excessive Lags] Free Float Filter Raw Result:', result.rows);
+        
+        const values = result.rows.map(row => row.value).filter(value => value != null && value !== '');
+        console.log('[Excessive Lags] Free Float Filter Final Values:', values);
+        
+        res.json(values);
+    } catch (error) {
+        console.error('[Schedule API] Error in excessive-lags-free-float-filters endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch free float filters' });
+    }
+});
+
+// Excessive Lags Driving filters endpoint
+app.get('/api/schedule/excessive-lags-driving-filters', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        
+        let query = `
+            SELECT DISTINCT driving as value
+            FROM activity_relationship_view
+            WHERE relationship_status = 'Incomplete'
+            AND excessive_lag = 'Excessive Lag'
+            AND CAST(lag AS REAL) > 0
+        `;
+        
+        const params = [];
+        if (projectId && projectId !== 'all') {
+            query += ` AND project_id = $1`;
+            params.push(projectId);
+        }
+        
+        query += ` ORDER BY driving ASC`;
+        
+        console.log('[Excessive Lags] Driving Filter Query:', query);
+        console.log('[Excessive Lags] Driving Filter Params:', params);
+        
+        const result = await db.query(query, params);
+        console.log('[Excessive Lags] Driving Filter Raw Result:', result.rows);
+        
+        const values = result.rows.map(row => row.value).filter(value => value != null && value !== '');
+        console.log('[Excessive Lags] Driving Filter Final Values:', values);
+        
+        res.json(values);
+    } catch (error) {
+        console.error('[Schedule API] Error in excessive-lags-driving-filters endpoint:', error);
+        res.status(500).json({ error: 'Failed to fetch driving filters' });
     }
 });
 
@@ -2792,14 +5182,27 @@ app.get('/api/schedule/test-table', async (req, res) => {
 app.get('/api/schedule/constraints-kpi', async (req, res) => {
     try {
         const projectId = req.query.project_id;
+        const activityType = req.query.activity_type;
+        const activityStatus = req.query.activity_status;
         
         // Get Constraints count (activities with specific Primary Constraints, excluding completed activities)
         let constraintFilters = ["primaryconstraint IN ('CS_MSO','CS_MSOB','CS_MSOA','CS_MEO','CS_MEOB','CS_MEOA','CS_ALAP')", "activitystatus != 'Complete'"];
         const constraintParams = [];
+        let paramIndex = 1;
         
         if (projectId && projectId !== 'all') {
-            constraintFilters.push('projectid = $1');
+            constraintFilters.push(`projectid = $${paramIndex++}`);
             constraintParams.push(projectId);
+        }
+        
+        if (activityType && activityType !== '') {
+            constraintFilters.push(`activitytype = $${paramIndex++}`);
+            constraintParams.push(activityType);
+        }
+        
+        if (activityStatus && activityStatus !== '') {
+            constraintFilters.push(`activitystatus = $${paramIndex++}`);
+            constraintParams.push(activityStatus);
         }
         
         const constraintWhereClause = constraintFilters.length > 0 ? 'WHERE ' + constraintFilters.join(' AND ') : '';
@@ -2811,10 +5214,21 @@ app.get('/api/schedule/constraints-kpi', async (req, res) => {
         // Get remaining activities count (activities that are not Complete)
         let remainingFilters = ["activitystatus != 'Complete'"];
         const remainingParams = [];
+        paramIndex = 1;
         
         if (projectId && projectId !== 'all') {
-            remainingFilters.push('projectid = $1');
+            remainingFilters.push(`projectid = $${paramIndex++}`);
             remainingParams.push(projectId);
+        }
+        
+        if (activityType && activityType !== '') {
+            remainingFilters.push(`activitytype = $${paramIndex++}`);
+            remainingParams.push(activityType);
+        }
+        
+        if (activityStatus && activityStatus !== '') {
+            remainingFilters.push(`activitystatus = $${paramIndex++}`);
+            remainingParams.push(activityStatus);
         }
         
         const remainingWhereClause = remainingFilters.length > 0 ? 'WHERE ' + remainingFilters.join(' AND ') : '';
@@ -2841,13 +5255,26 @@ app.get('/api/schedule/constraints-kpi', async (req, res) => {
 app.get('/api/schedule/constraints-chart-data', async (req, res) => {
     try {
         const projectId = req.query.project_id;
+        const activityType = req.query.activity_type;
+        const activityStatus = req.query.activity_status;
         
         let filters = ["primaryconstraint IN ('CS_MSO','CS_MSOB','CS_MSOA','CS_MEO','CS_MEOB','CS_MEOA','CS_ALAP')", "activitystatus != 'Complete'"];
         const params = [];
+        let paramIndex = 1;
         
         if (projectId && projectId !== 'all') {
-            filters.push('projectid = $1');
+            filters.push(`projectid = $${paramIndex++}`);
             params.push(projectId);
+        }
+        
+        if (activityType && activityType !== '') {
+            filters.push(`activitytype = $${paramIndex++}`);
+            params.push(activityType);
+        }
+        
+        if (activityStatus && activityStatus !== '') {
+            filters.push(`activitystatus = $${paramIndex++}`);
+            params.push(activityStatus);
         }
         
         const whereClause = filters.length > 0 ? 'WHERE ' + filters.join(' AND ') : '';
@@ -2876,6 +5303,8 @@ app.get('/api/schedule/constraints-chart-data', async (req, res) => {
 app.get('/api/schedule/constraints-percentage-history', async (req, res) => {
     try {
         const projectId = req.query.project_id;
+        const activityType = req.query.activity_type;
+        const activityStatus = req.query.activity_status;
         
         // Calculate Constraints percentage history using project table's last_recalc_date
         let query = `
@@ -2890,9 +5319,21 @@ app.get('/api/schedule/constraints-percentage-history', async (req, res) => {
         `;
         
         const params = [];
+        let paramIndex = 1;
+        
         if (projectId && projectId !== 'all') {
-            query += ` AND a.projectid = $1`;
+            query += ` AND p.proj_id = $${paramIndex++}`;
             params.push(projectId);
+        }
+        
+        if (activityType && activityType !== '') {
+            query += ` AND a.activitytype = $${paramIndex++}`;
+            params.push(activityType);
+        }
+        
+        if (activityStatus && activityStatus !== '') {
+            query += ` AND a.activitystatus = $${paramIndex++}`;
+            params.push(activityStatus);
         }
         
         query += ` GROUP BY TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM'), p.proj_id ORDER BY date, project_id`;
@@ -2915,14 +5356,27 @@ app.get('/api/schedule/constraints-percentage-history', async (req, res) => {
 app.get('/api/schedule/constraints', async (req, res) => {
     try {
         const projectId = req.query.project_id;
+        const activityType = req.query.activity_type;
+        const activityStatus = req.query.activity_status;
         const limit = req.query.limit || 20;
         
         let filters = ["primaryconstraint IN ('CS_MSO','CS_MSOB','CS_MSOA','CS_MEO','CS_MEOB','CS_MEOA','CS_ALAP')", "activitystatus != 'Complete'"];
         const params = [];
+        let paramIndex = 1;
         
         if (projectId && projectId !== 'all') {
-            filters.push('projectid = $1');
+            filters.push(`projectid = $${paramIndex++}`);
             params.push(projectId);
+        }
+        
+        if (activityType && activityType !== '') {
+            filters.push(`activitytype = $${paramIndex++}`);
+            params.push(activityType);
+        }
+        
+        if (activityStatus && activityStatus !== '') {
+            filters.push(`activitystatus = $${paramIndex++}`);
+            params.push(activityStatus);
         }
         
         const whereClause = filters.length > 0 ? 'WHERE ' + filters.join(' AND ') : '';
@@ -2966,32 +5420,54 @@ app.get('/api/schedule/constraints', async (req, res) => {
 app.get('/api/schedule/excessive-durations-kpi', async (req, res) => {
     try {
         const projectId = req.query.project_id;
+        const activityType = req.query.activity_type;
+        const activityStatus = req.query.activity_status;
         const params = [];
         let projectFilter = '';
+        let paramIndex = 1;
         
         if (projectId && projectId !== 'all') {
-            projectFilter = 'WHERE projectid = $1';
+            projectFilter = `WHERE projectid = $${paramIndex++}`;
             params.push(projectId);
         }
 
-        // Get ED Count and Remaining Activities
+        if (activityType && activityType !== '') {
+            if (projectFilter === '') {
+                projectFilter = `WHERE activitytype = $${paramIndex++}`;
+            } else {
+                projectFilter += ` AND activitytype = $${paramIndex++}`;
+            }
+            params.push(activityType);
+        }
+        
+        if (activityStatus && activityStatus !== '') {
+            if (projectFilter === '') {
+                projectFilter = `WHERE activitystatus = $${paramIndex++}`;
+            } else {
+                projectFilter += ` AND activitystatus = $${paramIndex++}`;
+            }
+            params.push(activityStatus);
+        } else {
+            // If no activity status filter is applied, use the default filter
+            if (projectFilter === '') {
+                projectFilter = `WHERE activitystatus IN ('Active', 'NotStart')`;
+            } else {
+                projectFilter += ` AND activitystatus IN ('Active', 'NotStart')`;
+            }
+        }
+
+        // Get ED Count and Remaining Activities - Optimized
         const query = `
-            WITH metrics AS (
                 SELECT 
-                    COUNT(*) FILTER (WHERE CAST(originalduration AS INTEGER) >= 20 AND activitystatus IN ('Active', 'NotStart')) as ed_count,
-                    COUNT(*) FILTER (WHERE activitystatus IN ('Active', 'NotStart')) as remaining_activities
-                FROM activityanalysisview
-                ${projectFilter}
-            )
-            SELECT 
-                ed_count as "ED_Count",
-                remaining_activities as "Remaining_Activities",
+                COUNT(*) FILTER (WHERE CAST(originalduration AS INTEGER) >= 20) as "ED_Count",
+                COUNT(*) as "Remaining_Activities",
                 CASE 
-                    WHEN remaining_activities > 0 
-                    THEN CAST(ROUND(CAST((ed_count::numeric / remaining_activities::numeric * 100) AS numeric), 1) AS numeric)
+                    WHEN COUNT(*) > 0 
+                    THEN ROUND((COUNT(*) FILTER (WHERE CAST(originalduration AS INTEGER) >= 20)::numeric * 100.0 / COUNT(*)::numeric), 1)
                     ELSE 0 
                 END as "Excessive_Duration_Percentage"
-            FROM metrics
+            FROM activityanalysisview
+            ${projectFilter}
         `;
 
         console.log('Executing query:', query);
@@ -3016,26 +5492,41 @@ app.get('/api/schedule/excessive-durations-kpi', async (req, res) => {
 app.get('/api/schedule/excessive-durations-chart-data', async (req, res) => {
     try {
         const projectId = req.query.project_id;
+        const activityType = req.query.activity_type;
+        const activityStatus = req.query.activity_status;
         const params = [];
         let projectFilter = '';
+        let paramIndex = 1;
         
         if (projectId && projectId !== 'all') {
-            projectFilter = 'AND projectid = $1';
+            projectFilter = `AND projectid = $${paramIndex++}`;
             params.push(projectId);
         }
 
-        // Get distribution of activities by status and duration category
+        if (activityType && activityType !== '') {
+            projectFilter += ` AND activitytype = $${paramIndex++}`;
+            params.push(activityType);
+        }
+        
+        if (activityStatus && activityStatus !== '') {
+            projectFilter += ` AND activitystatus = $${paramIndex++}`;
+            params.push(activityStatus);
+        } else {
+            // If no activity status filter is applied, use the default filter
+            projectFilter += ` AND activitystatus IN ('Active', 'NotStart')`;
+        }
+
+        // Get distribution of activities by status and duration category - Optimized
         const query = `
-            WITH ActivityCategories AS (
                 SELECT 
                     CASE 
                         WHEN CAST(originalduration AS INTEGER) >= 20 THEN 'Excessive Duration'
                         ELSE 'Normal Duration'
                     END as duration_category,
-                    activitystatus,
+                activitystatus as status,
                     COUNT(*) as count
                 FROM activityanalysisview
-                WHERE activitystatus IN ('Active', 'NotStart')
+            WHERE 1=1
                 ${projectFilter}
                 GROUP BY 
                     CASE 
@@ -3043,12 +5534,6 @@ app.get('/api/schedule/excessive-durations-chart-data', async (req, res) => {
                         ELSE 'Normal Duration'
                     END,
                     activitystatus
-            )
-            SELECT
-                duration_category,
-                activitystatus as status,
-                count
-            FROM ActivityCategories
             ORDER BY duration_category, activitystatus
         `;
 
@@ -3068,36 +5553,44 @@ app.get('/api/schedule/excessive-durations-chart-data', async (req, res) => {
 app.get('/api/schedule/excessive-durations-percentage-history', async (req, res) => {
     try {
         const projectId = req.query.project_id;
+        const activityType = req.query.activity_type;
+        const activityStatus = req.query.activity_status;
         
-        // Calculate Excessive Durations percentage history using project table's last_recalc_date
+        // Calculate Excessive Durations percentage history using project table's last_recalc_date - Optimized
         let query = `
-            WITH ActivityMetrics AS (
                 SELECT 
-                    p.last_recalc_date::DATE as calc_date,
-                    COUNT(CASE WHEN CAST(a.originalduration AS INTEGER) >= 20 AND a.activitystatus IN ('Active', 'NotStart') THEN 1 END) as ed_count,
-                    COUNT(CASE WHEN a.activitystatus IN ('Active', 'NotStart') THEN 1 END) as total_count
+                TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM') as date,
+                p.proj_id as project_id,
+                COUNT(CASE WHEN CAST(a.originalduration AS INTEGER) >= 20 THEN 1 END) * 100.0 / 
+                NULLIF(COUNT(*), 0) as percentage
                 FROM activityanalysisview a
                 INNER JOIN project p ON a.projectid = p.proj_id
                 WHERE p.last_recalc_date IS NOT NULL
         `;
         
         const params = [];
+        let paramIndex = 1;
         if (projectId && projectId !== 'all') {
-            query += ` AND a.projectid = $1`;
+            query += ` AND a.projectid = $${paramIndex++}`;
             params.push(projectId);
         }
         
+        if (activityType && activityType !== '') {
+            query += ` AND a.activitytype = $${paramIndex++}`;
+            params.push(activityType);
+        }
+        
+        if (activityStatus && activityStatus !== '') {
+            query += ` AND a.activitystatus = $${paramIndex++}`;
+            params.push(activityStatus);
+        } else {
+            // If no activity status filter is applied, use the default filter
+            query += ` AND a.activitystatus IN ('Active', 'NotStart')`;
+        }
+        
         query += `
-                GROUP BY p.last_recalc_date::DATE
-            )
-            SELECT 
-                TO_CHAR(calc_date, 'YYYY-MM') as date,
-                CASE 
-                    WHEN total_count > 0 THEN ROUND(CAST(ed_count AS NUMERIC) * 100.0 / total_count, 1)
-                    ELSE 0 
-                END as percentage
-            FROM ActivityMetrics
-            ORDER BY calc_date ASC
+                GROUP BY TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM'), p.proj_id
+                ORDER BY date, project_id
         `;
 
         console.log('Executing query:', query);
@@ -3123,12 +5616,25 @@ app.get('/api/schedule/excessive-durations', async (req, res) => {
     try {
         const limit = req.query.limit || 20;
         const projectId = req.query.project_id;
+        const activityType = req.query.activity_type;
+        const activityStatus = req.query.activity_status;
         const params = [limit];
         let projectFilter = '';
+        let paramIndex = 2; // Start from 2 since limit is $1
         
         if (projectId && projectId !== 'all') {
-            projectFilter = 'AND projectid = $2';
+            projectFilter = `AND projectid = $${paramIndex++}`;
             params.push(projectId);
+        }
+        
+        if (activityType && activityType !== '') {
+            projectFilter += ` AND activitytype = $${paramIndex++}`;
+            params.push(activityType);
+        }
+        
+        if (activityStatus && activityStatus !== '') {
+            projectFilter += ` AND activitystatus = $${paramIndex++}`;
+            params.push(activityStatus);
         }
 
         const query = `
@@ -3144,7 +5650,6 @@ app.get('/api/schedule/excessive-durations', async (req, res) => {
                 activitystatus as "Activity Status"
             FROM activityanalysisview
             WHERE CAST(originalduration AS INTEGER) >= 20
-            AND activitystatus IN ('Active', 'NotStart')
             ${projectFilter}
             ORDER BY CAST(originalduration AS INTEGER) DESC
             LIMIT $1
@@ -3167,32 +5672,59 @@ app.get('/api/schedule/excessive-durations', async (req, res) => {
 app.get('/api/schedule/negative-float-kpi', async (req, res) => {
     try {
         const projectId = req.query.project_id;
+        const activityType = req.query.activity_type;
+        const activityStatus = req.query.activity_status;
         const params = [];
         let projectFilter = '';
+        let paramIndex = 1;
         
         if (projectId && projectId !== 'all') {
             projectFilter = 'WHERE projectid = $1';
             params.push(projectId);
+            paramIndex++;
+        }
+
+        // Add activity type filter
+        if (activityType && activityType !== '') {
+            if (projectFilter === '') {
+                projectFilter = 'WHERE activitytype = $1';
+            } else {
+                projectFilter += ` AND activitytype = $${paramIndex}`;
+            }
+            params.push(activityType);
+            paramIndex++;
+        }
+
+        // Add activity status filter
+        if (activityStatus && activityStatus !== '') {
+            if (projectFilter === '') {
+                projectFilter = 'WHERE activitystatus = $1';
+            } else {
+                projectFilter += ` AND activitystatus = $${paramIndex}`;
+            }
+            params.push(activityStatus);
+            paramIndex++;
+        } else {
+            // If no activity status filter is applied, use the default filter
+            if (projectFilter === '') {
+                projectFilter = 'WHERE activitystatus IN (\'Active\', \'NotStart\')';
+            } else {
+                projectFilter += ` AND activitystatus IN ('Active', 'NotStart')`;
+            }
         }
 
         // Get NTF Count and Remaining Activities
         const query = `
-            WITH metrics AS (
                 SELECT 
-                    COUNT(*) FILTER (WHERE totalfloatdays < 0 AND activitystatus IN ('Active', 'NotStart')) as ntf_count,
-                    COUNT(*) FILTER (WHERE activitystatus IN ('Active', 'NotStart')) as remaining_activities
-                FROM activityanalysisview
-                ${projectFilter}
-            )
-            SELECT 
-                ntf_count as "NTF_Count",
-                remaining_activities as "Remaining_Activities",
+                COUNT(*) FILTER (WHERE totalfloatdays < 0) as "NTF_Count",
+                COUNT(*) as "Remaining_Activities",
                 CASE 
-                    WHEN remaining_activities > 0 
-                    THEN CAST(ROUND(CAST((ntf_count::numeric / remaining_activities::numeric * 100) AS numeric), 1) AS numeric)
+                    WHEN COUNT(*) > 0 
+                    THEN CAST(ROUND(CAST((COUNT(*) FILTER (WHERE totalfloatdays < 0)::numeric / COUNT(*)::numeric * 100) AS numeric), 1) AS numeric)
                     ELSE 0 
                 END as "Negative_Float_Percentage"
-            FROM metrics
+            FROM activityanalysisview
+            ${projectFilter}
         `;
 
         const result = await db.query(query, params);
@@ -3212,12 +5744,33 @@ app.get('/api/schedule/negative-float-kpi', async (req, res) => {
 app.get('/api/schedule/negative-float-chart-data', async (req, res) => {
     try {
         const projectId = req.query.project_id;
+        const activityType = req.query.activity_type;
+        const activityStatus = req.query.activity_status;
         const params = [];
         let projectFilter = '';
+        let paramIndex = 1;
         
         if (projectId && projectId !== 'all') {
             projectFilter = 'AND projectid = $1';
             params.push(projectId);
+            paramIndex++;
+        }
+
+        // Add activity type filter
+        if (activityType && activityType !== '') {
+            projectFilter += ` AND activitytype = $${paramIndex}`;
+            params.push(activityType);
+            paramIndex++;
+        }
+
+        // Add activity status filter
+        if (activityStatus && activityStatus !== '') {
+            projectFilter += ` AND activitystatus = $${paramIndex}`;
+            params.push(activityStatus);
+            paramIndex++;
+        } else {
+            // If no activity status filter is applied, use the default filter
+            projectFilter += ` AND activitystatus IN ('Active', 'NotStart')`;
         }
 
         // Get scatter plot data with filter for negative float days
@@ -3227,8 +5780,7 @@ app.get('/api/schedule/negative-float-chart-data', async (req, res) => {
                 totalfloatdays as float_days,
                 COUNT(*) as activity_count
             FROM activityanalysisview
-            WHERE activitystatus IN ('Active', 'NotStart')
-            AND totalfloatdays < 0
+            WHERE totalfloatdays < 0
             ${projectFilter}
             GROUP BY activitystatus, totalfloatdays
             ORDER BY activitystatus, totalfloatdays
@@ -3246,36 +5798,49 @@ app.get('/api/schedule/negative-float-chart-data', async (req, res) => {
 app.get('/api/schedule/negative-float-percentage-history', async (req, res) => {
     try {
         const projectId = req.query.project_id;
+        const activityType = req.query.activity_type;
+        const activityStatus = req.query.activity_status;
         
         // Calculate Negative Float percentage history using project table's last_recalc_date
         let query = `
-            WITH ActivityMetrics AS (
                 SELECT 
-                    p.last_recalc_date::DATE as calc_date,
-                    COUNT(CASE WHEN a.totalfloatdays < 0 AND a.activitystatus IN ('Active', 'NotStart') THEN 1 END) as ntf_count,
-                    COUNT(CASE WHEN a.activitystatus IN ('Active', 'NotStart') THEN 1 END) as total_count
+                TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM') as date,
+                p.proj_id as project_id,
+                COUNT(CASE WHEN a.totalfloatdays < 0 THEN 1 END) * 100.0 /
+                NULLIF(COUNT(*), 0) as percentage
                 FROM activityanalysisview a
                 INNER JOIN project p ON a.projectid = p.proj_id
                 WHERE p.last_recalc_date IS NOT NULL
         `;
         
         const params = [];
+        let paramIndex = 1;
         if (projectId && projectId !== 'all') {
-            query += ` AND a.projectid = $1`;
+            query += ` AND a.projectid = $${paramIndex}`;
             params.push(projectId);
+            paramIndex++;
+        }
+        
+        // Add activity type filter
+        if (activityType && activityType !== '') {
+            query += ` AND a.activitytype = $${paramIndex}`;
+            params.push(activityType);
+            paramIndex++;
+        }
+        
+        // Add activity status filter
+        if (activityStatus && activityStatus !== '') {
+            query += ` AND a.activitystatus = $${paramIndex}`;
+            params.push(activityStatus);
+            paramIndex++;
+        } else {
+            // If no activity status filter is applied, use the default filter
+            query += ` AND a.activitystatus IN ('Active', 'NotStart')`;
         }
         
         query += `
-                GROUP BY p.last_recalc_date::DATE
-            )
-            SELECT 
-                TO_CHAR(calc_date, 'YYYY-MM') as date,
-                CASE 
-                    WHEN total_count > 0 THEN ROUND(CAST(ntf_count AS NUMERIC) * 100.0 / total_count, 1)
-                    ELSE 0 
-                END as percentage
-            FROM ActivityMetrics
-            ORDER BY calc_date ASC
+                GROUP BY TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM'), p.proj_id
+                ORDER BY date, project_id
         `;
 
         const result = await db.query(query, params);
@@ -3297,12 +5862,31 @@ app.get('/api/schedule/negative-float', async (req, res) => {
     try {
         const limit = req.query.limit || 20;
         const projectId = req.query.project_id;
+        const activityType = req.query.activity_type;
+        const activityStatus = req.query.activity_status;
         const params = [limit];
         let projectFilter = '';
+        let paramIndex = 2; // Start from 2 since limit is $1
         
         if (projectId && projectId !== 'all') {
             projectFilter = 'AND projectid = $2';
             params.push(projectId);
+            paramIndex++;
+        }
+        
+        if (activityType && activityType !== '') {
+            projectFilter += ` AND activitytype = $${paramIndex}`;
+            params.push(activityType);
+            paramIndex++;
+        }
+        
+        if (activityStatus && activityStatus !== '') {
+            projectFilter += ` AND activitystatus = $${paramIndex}`;
+            params.push(activityStatus);
+            paramIndex++;
+        } else {
+            // If no activity status filter is applied, use the default filter
+            projectFilter += ` AND activitystatus IN ('Active', 'NotStart')`;
         }
 
         const query = `
@@ -3318,7 +5902,6 @@ app.get('/api/schedule/negative-float', async (req, res) => {
                 activitystatus as "Activity Status"
             FROM activityanalysisview
             WHERE totalfloatdays < 0
-            AND activitystatus IN ('Active', 'NotStart')
             ${projectFilter}
             ORDER BY totalfloatdays ASC
             LIMIT $1
@@ -3336,32 +5919,59 @@ app.get('/api/schedule/negative-float', async (req, res) => {
 app.get('/api/schedule/critical-float-kpi', async (req, res) => {
     try {
         const projectId = req.query.project_id;
+        const activityType = req.query.activity_type;
+        const activityStatus = req.query.activity_status;
         const params = [];
         let projectFilter = '';
+        let paramIndex = 1;
         
         if (projectId && projectId !== 'all') {
             projectFilter = 'WHERE projectid = $1';
             params.push(projectId);
+            paramIndex++;
+        }
+
+        // Add activity type filter
+        if (activityType && activityType !== '') {
+            if (projectFilter === '') {
+                projectFilter = 'WHERE activitytype = $1';
+            } else {
+                projectFilter += ` AND activitytype = $${paramIndex}`;
+            }
+            params.push(activityType);
+            paramIndex++;
+        }
+
+        // Add activity status filter
+        if (activityStatus && activityStatus !== '') {
+            if (projectFilter === '') {
+                projectFilter = 'WHERE activitystatus = $1';
+            } else {
+                projectFilter += ` AND activitystatus = $${paramIndex}`;
+            }
+            params.push(activityStatus);
+            paramIndex++;
+        } else {
+            // If no activity status filter is applied, use the default filter
+            if (projectFilter === '') {
+                projectFilter = 'WHERE activitystatus IN (\'Active\', \'NotStart\')';
+            } else {
+                projectFilter += ` AND activitystatus IN ('Active', 'NotStart')`;
+            }
         }
 
         // Get CTF Count and Remaining Activities
         const query = `
-            WITH metrics AS (
                 SELECT 
-                    COUNT(*) FILTER (WHERE totalfloatdays >= 0 AND totalfloatdays <= 15 AND activitystatus IN ('Active', 'NotStart')) as ctf_count,
-                    COUNT(*) FILTER (WHERE activitystatus IN ('Active', 'NotStart')) as remaining_activities
-                FROM activityanalysisview
-                ${projectFilter}
-            )
-            SELECT 
-                ctf_count as "CTF_Count",
-                remaining_activities as "Remaining_Activities",
+                COUNT(*) FILTER (WHERE totalfloatdays >= 0 AND totalfloatdays <= 15) as "CTF_Count",
+                COUNT(*) as "Remaining_Activities",
                 CASE 
-                    WHEN remaining_activities > 0 
-                    THEN CAST(ROUND(CAST((ctf_count::numeric / remaining_activities::numeric * 100) AS numeric), 1) AS numeric)
+                    WHEN COUNT(*) > 0 
+                    THEN CAST(ROUND(CAST((COUNT(*) FILTER (WHERE totalfloatdays >= 0 AND totalfloatdays <= 15)::numeric / COUNT(*)::numeric * 100) AS numeric), 1) AS numeric)
                     ELSE 0 
                 END as "Critical_Float_Percentage"
-            FROM metrics
+            FROM activityanalysisview
+            ${projectFilter}
         `;
 
         const result = await db.query(query, params);
@@ -3381,12 +5991,33 @@ app.get('/api/schedule/critical-float-kpi', async (req, res) => {
 app.get('/api/schedule/critical-float-chart-data', async (req, res) => {
     try {
         const projectId = req.query.project_id;
+        const activityType = req.query.activity_type;
+        const activityStatus = req.query.activity_status;
         const params = [];
         let projectFilter = '';
+        let paramIndex = 1;
         
         if (projectId && projectId !== 'all') {
             projectFilter = 'AND projectid = $1';
             params.push(projectId);
+            paramIndex++;
+        }
+
+        // Add activity type filter
+        if (activityType && activityType !== '') {
+            projectFilter += ` AND activitytype = $${paramIndex}`;
+            params.push(activityType);
+            paramIndex++;
+        }
+
+        // Add activity status filter
+        if (activityStatus && activityStatus !== '') {
+            projectFilter += ` AND activitystatus = $${paramIndex}`;
+            params.push(activityStatus);
+            paramIndex++;
+        } else {
+            // If no activity status filter is applied, use the default filter
+            projectFilter += ` AND activitystatus IN ('Active', 'NotStart')`;
         }
 
         // Get scatter plot data with the specific filter condition (0 <= Total Float Days <= 15)
@@ -3396,8 +6027,7 @@ app.get('/api/schedule/critical-float-chart-data', async (req, res) => {
                 totalfloatdays as float_days,
                 COUNT(*) as activity_count
             FROM activityanalysisview
-            WHERE activitystatus IN ('Active', 'NotStart')
-            AND totalfloatdays >= 0 AND totalfloatdays <= 15
+            WHERE totalfloatdays >= 0 AND totalfloatdays <= 15
             ${projectFilter}
             GROUP BY activitystatus, totalfloatdays
             ORDER BY activitystatus, totalfloatdays
@@ -3415,36 +6045,49 @@ app.get('/api/schedule/critical-float-chart-data', async (req, res) => {
 app.get('/api/schedule/critical-float-percentage-history', async (req, res) => {
     try {
         const projectId = req.query.project_id;
+        const activityType = req.query.activity_type;
+        const activityStatus = req.query.activity_status;
         
         // Calculate Critical Float percentage history using project table's last_recalc_date
         let query = `
-            WITH ActivityMetrics AS (
                 SELECT 
-                    p.last_recalc_date::DATE as calc_date,
-                    COUNT(CASE WHEN a.totalfloatdays >= 0 AND a.totalfloatdays <= 15 AND a.activitystatus IN ('Active', 'NotStart') THEN 1 END) as ctf_count,
-                    COUNT(CASE WHEN a.activitystatus IN ('Active', 'NotStart') THEN 1 END) as total_count
+                TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM') as date,
+                p.proj_id as project_id,
+                COUNT(CASE WHEN a.totalfloatdays >= 0 AND a.totalfloatdays <= 15 THEN 1 END) * 100.0 /
+                NULLIF(COUNT(*), 0) as percentage
                 FROM activityanalysisview a
                 INNER JOIN project p ON a.projectid = p.proj_id
                 WHERE p.last_recalc_date IS NOT NULL
         `;
         
         const params = [];
+        let paramIndex = 1;
         if (projectId && projectId !== 'all') {
-            query += ` AND a.projectid = $1`;
+            query += ` AND a.projectid = $${paramIndex}`;
             params.push(projectId);
+            paramIndex++;
+        }
+        
+        // Add activity type filter
+        if (activityType && activityType !== '') {
+            query += ` AND a.activitytype = $${paramIndex}`;
+            params.push(activityType);
+            paramIndex++;
+        }
+        
+        // Add activity status filter
+        if (activityStatus && activityStatus !== '') {
+            query += ` AND a.activitystatus = $${paramIndex}`;
+            params.push(activityStatus);
+            paramIndex++;
+        } else {
+            // If no activity status filter is applied, use the default filter
+            query += ` AND a.activitystatus IN ('Active', 'NotStart')`;
         }
         
         query += `
-                GROUP BY p.last_recalc_date::DATE
-            )
-            SELECT 
-                TO_CHAR(calc_date, 'YYYY-MM') as date,
-                CASE 
-                    WHEN total_count > 0 THEN ROUND(CAST(ctf_count AS NUMERIC) * 100.0 / total_count, 1)
-                    ELSE 0 
-                END as percentage
-            FROM ActivityMetrics
-            ORDER BY calc_date ASC
+                GROUP BY TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM'), p.proj_id
+                ORDER BY date, project_id
         `;
 
         const result = await db.query(query, params);
@@ -3466,12 +6109,31 @@ app.get('/api/schedule/critical-float', async (req, res) => {
     try {
         const limit = req.query.limit || 20;
         const projectId = req.query.project_id;
+        const activityType = req.query.activity_type;
+        const activityStatus = req.query.activity_status;
         const params = [limit];
         let projectFilter = '';
+        let paramIndex = 2; // Start from 2 since limit is $1
         
         if (projectId && projectId !== 'all') {
             projectFilter = 'AND projectid = $2';
             params.push(projectId);
+            paramIndex++;
+        }
+        
+        if (activityType && activityType !== '') {
+            projectFilter += ` AND activitytype = $${paramIndex}`;
+            params.push(activityType);
+            paramIndex++;
+        }
+        
+        if (activityStatus && activityStatus !== '') {
+            projectFilter += ` AND activitystatus = $${paramIndex}`;
+            params.push(activityStatus);
+            paramIndex++;
+        } else {
+            // If no activity status filter is applied, use the default filter
+            projectFilter += ` AND activitystatus IN ('Active', 'NotStart')`;
         }
 
         const query = `
@@ -3487,7 +6149,6 @@ app.get('/api/schedule/critical-float', async (req, res) => {
                 activitystatus as "Activity Status"
             FROM activityanalysisview
             WHERE totalfloatdays >= 0 AND totalfloatdays <= 15
-            AND activitystatus IN ('Active', 'NotStart')
             ${projectFilter}
             ORDER BY totalfloatdays ASC
             LIMIT $1
@@ -3505,32 +6166,59 @@ app.get('/api/schedule/critical-float', async (req, res) => {
 app.get('/api/schedule/excessive-float-kpi', async (req, res) => {
     try {
         const projectId = req.query.project_id;
+        const activityType = req.query.activity_type;
+        const activityStatus = req.query.activity_status;
         const params = [];
         let projectFilter = '';
+        let paramIndex = 1;
         
         if (projectId && projectId !== 'all') {
             projectFilter = 'WHERE projectid = $1';
             params.push(projectId);
+            paramIndex++;
+        }
+
+        // Add activity type filter
+        if (activityType && activityType !== '') {
+            if (projectFilter === '') {
+                projectFilter = 'WHERE activitytype = $1';
+            } else {
+                projectFilter += ` AND activitytype = $${paramIndex}`;
+            }
+            params.push(activityType);
+            paramIndex++;
+        }
+
+        // Add activity status filter
+        if (activityStatus && activityStatus !== '') {
+            if (projectFilter === '') {
+                projectFilter = 'WHERE activitystatus = $1';
+            } else {
+                projectFilter += ` AND activitystatus = $${paramIndex}`;
+            }
+            params.push(activityStatus);
+            paramIndex++;
+        } else {
+            // If no activity status filter is applied, use the default filter
+            if (projectFilter === '') {
+                projectFilter = 'WHERE activitystatus IN (\'Active\', \'NotStart\')';
+            } else {
+                projectFilter += ` AND activitystatus IN ('Active', 'NotStart')`;
+            }
         }
 
         // Get ETF Count and Remaining Activities
         const query = `
-            WITH metrics AS (
                 SELECT 
-                    COUNT(*) FILTER (WHERE totalfloatdays >= 40 AND activitystatus IN ('Active', 'NotStart')) as etf_count,
-                    COUNT(*) FILTER (WHERE activitystatus IN ('Active', 'NotStart')) as remaining_activities
-                FROM activityanalysisview
-                ${projectFilter}
-            )
-            SELECT 
-                etf_count as "ETF_Count",
-                remaining_activities as "Remaining_Activities",
+                COUNT(*) FILTER (WHERE totalfloatdays >= 40) as "ETF_Count",
+                COUNT(*) as "Remaining_Activities",
                 CASE 
-                    WHEN remaining_activities > 0 
-                    THEN CAST(ROUND(CAST((etf_count::numeric / remaining_activities::numeric * 100) AS numeric), 1) AS numeric)
+                    WHEN COUNT(*) > 0 
+                    THEN CAST(ROUND(CAST((COUNT(*) FILTER (WHERE totalfloatdays >= 40)::numeric / COUNT(*)::numeric * 100) AS numeric), 1) AS numeric)
                     ELSE 0 
                 END as "Excessive_Float_Percentage"
-            FROM metrics
+            FROM activityanalysisview
+            ${projectFilter}
         `;
 
         const result = await db.query(query, params);
@@ -3550,34 +6238,45 @@ app.get('/api/schedule/excessive-float-kpi', async (req, res) => {
 app.get('/api/schedule/excessive-float-chart-data', async (req, res) => {
     try {
         const projectId = req.query.project_id;
+        const activityType = req.query.activity_type;
+        const activityStatus = req.query.activity_status;
         const params = [];
         let projectFilter = '';
+        let paramIndex = 1;
         
         if (projectId && projectId !== 'all') {
             projectFilter = 'AND projectid = $1';
             params.push(projectId);
+            paramIndex++;
+        }
+
+        // Add activity type filter
+        if (activityType && activityType !== '') {
+            projectFilter += ` AND activitytype = $${paramIndex}`;
+            params.push(activityType);
+            paramIndex++;
+        }
+
+        // Add activity status filter
+        if (activityStatus && activityStatus !== '') {
+            projectFilter += ` AND activitystatus = $${paramIndex}`;
+            params.push(activityStatus);
+            paramIndex++;
+        } else {
+            // If no activity status filter is applied, use the default filter
+            projectFilter += ` AND activitystatus IN ('Active', 'NotStart')`;
         }
 
         // Get scatter plot data with filter for excessive float days (>= 40)
         const query = `
-            WITH ActivityCounts AS (
                 SELECT 
-                    activitystatus,
-                    totalfloatdays,
-                    COUNT(*) OVER (PARTITION BY activitystatus) as total_by_status,
-                    COUNT(*) as count_per_float
-                FROM activityanalysisview
-                WHERE activitystatus IN ('Active', 'NotStart')
-                AND totalfloatdays >= 40
-                ${projectFilter}
-                GROUP BY activitystatus, totalfloatdays
-            )
-            SELECT 
                 activitystatus as status,
                 totalfloatdays as float_days,
-                count_per_float as activity_count,
-                total_by_status
-            FROM ActivityCounts
+                COUNT(*) as activity_count
+                FROM activityanalysisview
+            WHERE totalfloatdays >= 40
+                ${projectFilter}
+                GROUP BY activitystatus, totalfloatdays
             ORDER BY activitystatus, totalfloatdays`;
 
         const result = await db.query(query, params);
@@ -3592,36 +6291,49 @@ app.get('/api/schedule/excessive-float-chart-data', async (req, res) => {
 app.get('/api/schedule/excessive-float-percentage-history', async (req, res) => {
     try {
         const projectId = req.query.project_id;
+        const activityType = req.query.activity_type;
+        const activityStatus = req.query.activity_status;
         
         // Calculate Excessive Float percentage history using project table's last_recalc_date
         let query = `
-            WITH ActivityMetrics AS (
                 SELECT 
-                    p.last_recalc_date::DATE as calc_date,
-                    COUNT(CASE WHEN a.totalfloatdays >= 40 AND a.activitystatus IN ('Active', 'NotStart') THEN 1 END) as etf_count,
-                    COUNT(CASE WHEN a.activitystatus IN ('Active', 'NotStart') THEN 1 END) as total_count
+                TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM') as date,
+                p.proj_id as project_id,
+                COUNT(CASE WHEN a.totalfloatdays >= 40 THEN 1 END) * 100.0 /
+                NULLIF(COUNT(*), 0) as percentage
                 FROM activityanalysisview a
                 INNER JOIN project p ON a.projectid = p.proj_id
                 WHERE p.last_recalc_date IS NOT NULL
         `;
         
         const params = [];
+        let paramIndex = 1;
         if (projectId && projectId !== 'all') {
-            query += ` AND a.projectid = $1`;
+            query += ` AND a.projectid = $${paramIndex}`;
             params.push(projectId);
+            paramIndex++;
+        }
+        
+        // Add activity type filter
+        if (activityType && activityType !== '') {
+            query += ` AND a.activitytype = $${paramIndex}`;
+            params.push(activityType);
+            paramIndex++;
+        }
+        
+        // Add activity status filter
+        if (activityStatus && activityStatus !== '') {
+            query += ` AND a.activitystatus = $${paramIndex}`;
+            params.push(activityStatus);
+            paramIndex++;
+        } else {
+            // If no activity status filter is applied, use the default filter
+            query += ` AND a.activitystatus IN ('Active', 'NotStart')`;
         }
         
         query += `
-                GROUP BY p.last_recalc_date::DATE
-            )
-            SELECT 
-                TO_CHAR(calc_date, 'YYYY-MM') as date,
-                CASE 
-                    WHEN total_count > 0 THEN ROUND(CAST(etf_count AS NUMERIC) * 100.0 / total_count, 1)
-                    ELSE 0 
-                END as percentage
-            FROM ActivityMetrics
-            ORDER BY calc_date ASC
+                GROUP BY TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM'), p.proj_id
+                ORDER BY date, project_id
         `;
 
         const result = await db.query(query, params);
@@ -3643,12 +6355,31 @@ app.get('/api/schedule/excessive-float', async (req, res) => {
     try {
         const limit = req.query.limit || 20;
         const projectId = req.query.project_id;
+        const activityType = req.query.activity_type;
+        const activityStatus = req.query.activity_status;
         const params = [limit];
         let projectFilter = '';
+        let paramIndex = 2; // Start from 2 since limit is $1
         
         if (projectId && projectId !== 'all') {
             projectFilter = 'AND projectid = $2';
             params.push(projectId);
+            paramIndex++;
+        }
+        
+        if (activityType && activityType !== '') {
+            projectFilter += ` AND activitytype = $${paramIndex}`;
+            params.push(activityType);
+            paramIndex++;
+        }
+        
+        if (activityStatus && activityStatus !== '') {
+            projectFilter += ` AND activitystatus = $${paramIndex}`;
+            params.push(activityStatus);
+            paramIndex++;
+        } else {
+            // If no activity status filter is applied, use the default filter
+            projectFilter += ` AND activitystatus IN ('Active', 'NotStart')`;
         }
 
         const query = `
@@ -3664,7 +6395,6 @@ app.get('/api/schedule/excessive-float', async (req, res) => {
                 activitystatus as "Activity Status"
             FROM activityanalysisview
             WHERE totalfloatdays >= 40
-            AND activitystatus IN ('Active', 'NotStart')
             ${projectFilter}
             ORDER BY totalfloatdays DESC
             LIMIT $1
@@ -3682,33 +6412,60 @@ app.get('/api/schedule/excessive-float', async (req, res) => {
 app.get('/api/schedule/invalid-dates-kpi', async (req, res) => {
     try {
         const projectId = req.query.project_id;
+        const activityType = req.query.activity_type;
+        const activityStatus = req.query.activity_status;
         const params = [];
         let projectFilter = '';
+        let paramIndex = 1;
         
         if (projectId && projectId !== 'all') {
             projectFilter = 'WHERE projectid = $1';
             params.push(projectId);
+            paramIndex++;
+        }
+        
+        if (activityType && activityType !== '') {
+            if (projectFilter === '') {
+                projectFilter = 'WHERE activitytype = $1';
+            } else {
+                projectFilter += ` AND activitytype = $${paramIndex}`;
+            }
+            params.push(activityType);
+            paramIndex++;
+        }
+        
+        if (activityStatus && activityStatus !== '') {
+            if (projectFilter === '') {
+                projectFilter = 'WHERE activitystatus = $1';
+            } else {
+                projectFilter += ` AND activitystatus = $${paramIndex}`;
+            }
+            params.push(activityStatus);
+            paramIndex++;
+        } else {
+            if (projectFilter === '') {
+                projectFilter = 'WHERE activitystatus IN (\'Active\', \'NotStart\')';
+            } else {
+                projectFilter += ` AND activitystatus IN ('Active', 'NotStart')`;
+            }
         }
 
         // Get Invalid Dates Count and Remaining Activities
         const query = `
-            WITH metrics AS (
                 SELECT 
-                    COUNT(*) FILTER (WHERE (invalidstart = 'Invalid' OR invalidfinish = 'Invalid') AND activitystatus IN ('Active', 'NotStart')) as ind_count,
-                    COUNT(*) FILTER (WHERE activitystatus IN ('Active', 'NotStart')) as remaining_activities
-                FROM activityanalysisview
-                ${projectFilter}
-            )
-            SELECT 
-                ind_count as "IND_Count",
-                remaining_activities as "Remaining_Activities",
+                COUNT(*) FILTER (WHERE (invalidstart = 'Invalid' OR invalidfinish = 'Invalid')) as "IND_Count",
+                COUNT(*) as "Remaining_Activities",
                 CASE 
-                    WHEN remaining_activities > 0 
-                    THEN CAST(ROUND(CAST((ind_count::numeric / remaining_activities::numeric * 100) AS numeric), 1) AS numeric)
+                    WHEN COUNT(*) > 0 
+                    THEN CAST(ROUND(CAST((COUNT(*) FILTER (WHERE (invalidstart = 'Invalid' OR invalidfinish = 'Invalid'))::numeric / COUNT(*)::numeric * 100) AS numeric), 1) AS numeric)
                     ELSE 0 
                 END as "Invalid_Dates_Percentage"
-            FROM metrics
+            FROM activityanalysisview
+            ${projectFilter}
         `;
+
+        console.log('[Invalid Dates KPI] Query:', query);
+        console.log('[Invalid Dates KPI] Params:', params);
 
         const result = await db.query(query, params);
         
@@ -3716,6 +6473,7 @@ app.get('/api/schedule/invalid-dates-kpi', async (req, res) => {
             throw new Error('No data returned from query');
         }
         
+        console.log('[Invalid Dates KPI] Result:', result.rows[0]);
         res.json(result.rows[0]);
     } catch (error) {
         console.error('[Schedule API] Error in invalid-dates-kpi endpoint:', error);
@@ -3727,12 +6485,42 @@ app.get('/api/schedule/invalid-dates-kpi', async (req, res) => {
 app.get('/api/schedule/invalid-dates-chart-data', async (req, res) => {
     try {
         const projectId = req.query.project_id;
+        const activityType = req.query.activity_type;
+        const activityStatus = req.query.activity_status;
         const params = [];
         let projectFilter = '';
+        let paramIndex = 1;
         
         if (projectId && projectId !== 'all') {
-            projectFilter = 'AND projectid = $1';
+            projectFilter = 'WHERE projectid = $1';
             params.push(projectId);
+            paramIndex++;
+        }
+        
+        if (activityType && activityType !== '') {
+            if (projectFilter === '') {
+                projectFilter = 'WHERE activitytype = $1';
+            } else {
+                projectFilter += ` AND activitytype = $${paramIndex}`;
+            }
+            params.push(activityType);
+            paramIndex++;
+        }
+        
+        if (activityStatus && activityStatus !== '') {
+            if (projectFilter === '') {
+                projectFilter = 'WHERE activitystatus = $1';
+            } else {
+                projectFilter += ` AND activitystatus = $${paramIndex}`;
+            }
+            params.push(activityStatus);
+            paramIndex++;
+        } else {
+            if (projectFilter === '') {
+                projectFilter = 'WHERE activitystatus IN (\'Active\', \'NotStart\')';
+            } else {
+                projectFilter += ` AND activitystatus IN ('Active', 'NotStart')`;
+            }
         }
 
         // Get donut chart data by activity type
@@ -3741,14 +6529,17 @@ app.get('/api/schedule/invalid-dates-chart-data', async (req, res) => {
                 activitytype,
                 COUNT(*) as count
             FROM activityanalysisview
-            WHERE (invalidstart = 'Invalid' OR invalidfinish = 'Invalid')
-            AND activitystatus IN ('Active', 'NotStart')
             ${projectFilter}
+            AND (invalidstart = 'Invalid' OR invalidfinish = 'Invalid')
             GROUP BY activitytype
             ORDER BY count DESC
         `;
 
+        console.log('[Invalid Dates Chart] Query:', query);
+        console.log('[Invalid Dates Chart] Params:', params);
+
         const result = await db.query(query, params);
+        console.log('[Invalid Dates Chart] Result:', result.rows);
         res.json(result.rows);
     } catch (error) {
         console.error('[Schedule API] Error in invalid-dates-chart-data endpoint:', error);
@@ -3760,39 +6551,58 @@ app.get('/api/schedule/invalid-dates-chart-data', async (req, res) => {
 app.get('/api/schedule/invalid-dates-percentage-history', async (req, res) => {
     try {
         const projectId = req.query.project_id;
+        const activityType = req.query.activity_type;
+        const activityStatus = req.query.activity_status;
         
         // Calculate Invalid Dates percentage history using project table's last_recalc_date
         let query = `
-            WITH ActivityMetrics AS (
                 SELECT 
-                    p.last_recalc_date::DATE as calc_date,
-                    COUNT(CASE WHEN (a.invalidstart = 'Invalid' OR a.invalidfinish = 'Invalid') AND a.activitystatus IN ('Active', 'NotStart') THEN 1 END) as ind_count,
-                    COUNT(CASE WHEN a.activitystatus IN ('Active', 'NotStart') THEN 1 END) as total_count
+                TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM') as date,
+                p.proj_id as project_id,
+                COUNT(CASE WHEN (a.invalidstart = 'Invalid' OR a.invalidfinish = 'Invalid') THEN 1 END) as ind_count,
+                COUNT(*) as total_count,
+                CASE 
+                    WHEN COUNT(*) > 0 THEN ROUND(CAST(COUNT(CASE WHEN (a.invalidstart = 'Invalid' OR a.invalidfinish = 'Invalid') THEN 1 END) AS NUMERIC) * 100.0 / COUNT(*), 1)
+                    ELSE 0 
+                END as percentage
                 FROM activityanalysisview a
                 INNER JOIN project p ON a.projectid = p.proj_id
                 WHERE p.last_recalc_date IS NOT NULL
         `;
         
         const params = [];
+        let paramIndex = 1;
+        
         if (projectId && projectId !== 'all') {
-            query += ` AND a.projectid = $1`;
+            query += ` AND a.projectid = $${paramIndex}`;
             params.push(projectId);
+            paramIndex++;
+        }
+        
+        if (activityType && activityType !== '') {
+            query += ` AND a.activitytype = $${paramIndex}`;
+            params.push(activityType);
+            paramIndex++;
+        }
+        
+        if (activityStatus && activityStatus !== '') {
+            query += ` AND a.activitystatus = $${paramIndex}`;
+            params.push(activityStatus);
+            paramIndex++;
+        } else {
+            query += ` AND a.activitystatus IN ('Active', 'NotStart')`;
         }
         
         query += `
-                GROUP BY p.last_recalc_date::DATE
-            )
-            SELECT 
-                TO_CHAR(calc_date, 'YYYY-MM') as date,
-                CASE 
-                    WHEN total_count > 0 THEN ROUND(CAST(ind_count AS NUMERIC) * 100.0 / total_count, 1)
-                    ELSE 0 
-                END as percentage
-            FROM ActivityMetrics
-            ORDER BY calc_date ASC
+            GROUP BY p.last_recalc_date::DATE, p.proj_id
+            ORDER BY date ASC, project_id ASC
         `;
 
+        console.log('[Invalid Dates History] Query:', query);
+        console.log('[Invalid Dates History] Params:', params);
+
         const result = await db.query(query, params);
+        console.log('[Invalid Dates History] Result:', result.rows);
 
         const transformedData = result.rows.map(row => ({
             date: row.date,
@@ -3811,12 +6621,30 @@ app.get('/api/schedule/invalid-dates', async (req, res) => {
     try {
         const limit = req.query.limit || 20;
         const projectId = req.query.project_id;
+        const activityType = req.query.activity_type;
+        const activityStatus = req.query.activity_status;
         const params = [limit];
         let projectFilter = '';
+        let paramIndex = 2;
         
         if (projectId && projectId !== 'all') {
             projectFilter = 'AND projectid = $2';
             params.push(projectId);
+            paramIndex++;
+        }
+        
+        if (activityType && activityType !== '') {
+            projectFilter += ` AND activitytype = $${paramIndex}`;
+            params.push(activityType);
+            paramIndex++;
+        }
+        
+        if (activityStatus && activityStatus !== '') {
+            projectFilter += ` AND activitystatus = $${paramIndex}`;
+            params.push(activityStatus);
+            paramIndex++;
+        } else {
+            projectFilter += ` AND activitystatus IN ('Active', 'NotStart')`;
         }
 
         const query = `
@@ -3831,13 +6659,16 @@ app.get('/api/schedule/invalid-dates', async (req, res) => {
                 activitystatus as "Activity Status"
             FROM activityanalysisview
             WHERE (invalidstart = 'Invalid' OR invalidfinish = 'Invalid')
-            AND activitystatus IN ('Active', 'NotStart')
             ${projectFilter}
             ORDER BY activityid ASC
             LIMIT $1
         `;
 
+        console.log('[Invalid Dates Table] Query:', query);
+        console.log('[Invalid Dates Table] Params:', params);
+
         const result = await db.query(query, params);
+        console.log('[Invalid Dates Table] Result count:', result.rows.length);
         res.json(result.rows);
     } catch (error) {
         console.error('[Schedule API] Error in invalid-dates endpoint:', error);
@@ -3849,32 +6680,59 @@ app.get('/api/schedule/invalid-dates', async (req, res) => {
 app.get('/api/schedule/riding-data-date-kpi', async (req, res) => {
     try {
         const projectId = req.query.project_id;
+        const activityType = req.query.activity_type;
+        const activityStatus = req.query.activity_status;
         const params = [];
         let projectFilter = '';
+        let paramIndex = 1;
         
         if (projectId && projectId !== 'all') {
             projectFilter = 'WHERE projectid = $1';
             params.push(projectId);
+            paramIndex++;
+        }
+
+        // Add activity type filter
+        if (activityType && activityType !== '') {
+            if (projectFilter === '') {
+                projectFilter = 'WHERE activitytype = $1';
+            } else {
+                projectFilter += ` AND activitytype = $${paramIndex}`;
+            }
+            params.push(activityType);
+            paramIndex++;
+        }
+
+        // Add activity status filter
+        if (activityStatus && activityStatus !== '') {
+            if (projectFilter === '') {
+                projectFilter = 'WHERE activitystatus = $1';
+            } else {
+                projectFilter += ` AND activitystatus = $${paramIndex}`;
+            }
+            params.push(activityStatus);
+            paramIndex++;
+        } else {
+            // If no activity status filter is applied, use the default filter
+            if (projectFilter === '') {
+                projectFilter = 'WHERE activitystatus IN (\'Active\', \'NotStart\')';
+            } else {
+                projectFilter += ` AND activitystatus IN ('Active', 'NotStart')`;
+            }
         }
 
         // Get Riding Data Date Count and Remaining Activities
         const query = `
-            WITH metrics AS (
                 SELECT 
-                    COUNT(*) FILTER (WHERE ridingdatadate = 'Riding Data Date' AND activitystatus IN ('Active', 'NotStart')) as trdd_count,
-                    COUNT(*) FILTER (WHERE activitystatus != 'Complete') as remaining_activities
-                FROM activityanalysisview
-                ${projectFilter}
-            )
-            SELECT 
-                trdd_count as "TRDD_Count",
-                remaining_activities as "Remaining_Activities",
+                COUNT(*) FILTER (WHERE ridingdatadate = 'Riding Data Date') as "TRDD_Count",
+                COUNT(*) as "Remaining_Activities",
                 CASE 
-                    WHEN remaining_activities > 0 
-                    THEN CAST(ROUND(CAST((trdd_count::numeric / remaining_activities::numeric * 100) AS numeric), 1) AS numeric)
+                    WHEN COUNT(*) > 0 
+                    THEN CAST(ROUND(CAST((COUNT(*) FILTER (WHERE ridingdatadate = 'Riding Data Date')::numeric / COUNT(*)::numeric * 100) AS numeric), 1) AS numeric)
                     ELSE 0 
                 END as "Riding_Data_Date_Percentage"
-            FROM metrics
+            FROM activityanalysisview
+            ${projectFilter}
         `;
 
         const result = await db.query(query, params);
@@ -3894,12 +6752,33 @@ app.get('/api/schedule/riding-data-date-kpi', async (req, res) => {
 app.get('/api/schedule/riding-data-date-chart-data', async (req, res) => {
     try {
         const projectId = req.query.project_id;
+        const activityType = req.query.activity_type;
+        const activityStatus = req.query.activity_status;
         const params = [];
         let projectFilter = '';
+        let paramIndex = 1;
         
         if (projectId && projectId !== 'all') {
             projectFilter = 'AND projectid = $1';
             params.push(projectId);
+            paramIndex++;
+        }
+
+        // Add activity type filter
+        if (activityType && activityType !== '') {
+            projectFilter += ` AND activitytype = $${paramIndex}`;
+            params.push(activityType);
+            paramIndex++;
+        }
+
+        // Add activity status filter
+        if (activityStatus && activityStatus !== '') {
+            projectFilter += ` AND activitystatus = $${paramIndex}`;
+            params.push(activityStatus);
+            paramIndex++;
+        } else {
+            // If no activity status filter is applied, use the default filter
+            projectFilter += ` AND activitystatus IN ('Active', 'NotStart')`;
         }
 
         // Get donut chart data by activity type
@@ -3909,7 +6788,6 @@ app.get('/api/schedule/riding-data-date-chart-data', async (req, res) => {
                 COUNT(*) as count
             FROM activityanalysisview
             WHERE ridingdatadate = 'Riding Data Date'
-            AND activitystatus IN ('Active', 'NotStart')
             ${projectFilter}
             GROUP BY activitytype
             ORDER BY count DESC
@@ -3927,36 +6805,49 @@ app.get('/api/schedule/riding-data-date-chart-data', async (req, res) => {
 app.get('/api/schedule/riding-data-date-percentage-history', async (req, res) => {
     try {
         const projectId = req.query.project_id;
+        const activityType = req.query.activity_type;
+        const activityStatus = req.query.activity_status;
         
         // Calculate Riding Data Date percentage history using project table's last_recalc_date
         let query = `
-            WITH ActivityMetrics AS (
                 SELECT 
-                    p.last_recalc_date::DATE as calc_date,
-                    COUNT(CASE WHEN a.ridingdatadate = 'Riding Data Date' AND a.activitystatus IN ('Active', 'NotStart') THEN 1 END) as trdd_count,
-                    COUNT(CASE WHEN a.activitystatus != 'Complete' THEN 1 END) as total_count
+                TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM') as date,
+                p.proj_id as project_id,
+                COUNT(CASE WHEN a.ridingdatadate = 'Riding Data Date' THEN 1 END) * 100.0 /
+                NULLIF(COUNT(*), 0) as percentage
                 FROM activityanalysisview a
                 INNER JOIN project p ON a.projectid = p.proj_id
                 WHERE p.last_recalc_date IS NOT NULL
         `;
         
         const params = [];
+        let paramIndex = 1;
         if (projectId && projectId !== 'all') {
-            query += ` AND a.projectid = $1`;
+            query += ` AND a.projectid = $${paramIndex}`;
             params.push(projectId);
+            paramIndex++;
+        }
+        
+        // Add activity type filter
+        if (activityType && activityType !== '') {
+            query += ` AND a.activitytype = $${paramIndex}`;
+            params.push(activityType);
+            paramIndex++;
+        }
+        
+        // Add activity status filter
+        if (activityStatus && activityStatus !== '') {
+            query += ` AND a.activitystatus = $${paramIndex}`;
+            params.push(activityStatus);
+            paramIndex++;
+        } else {
+            // If no activity status filter is applied, use the default filter
+            query += ` AND a.activitystatus IN ('Active', 'NotStart')`;
         }
         
         query += `
-                GROUP BY p.last_recalc_date::DATE
-            )
-            SELECT 
-                TO_CHAR(calc_date, 'YYYY-MM') as date,
-                CASE 
-                    WHEN total_count > 0 THEN ROUND(CAST(trdd_count AS NUMERIC) * 100.0 / total_count, 1)
-                    ELSE 0 
-                END as percentage
-            FROM ActivityMetrics
-            ORDER BY calc_date ASC
+                GROUP BY TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM'), p.proj_id
+                ORDER BY date, project_id
         `;
 
         const result = await db.query(query, params);
@@ -3978,12 +6869,31 @@ app.get('/api/schedule/riding-data-date', async (req, res) => {
     try {
         const limit = req.query.limit || 20;
         const projectId = req.query.project_id;
+        const activityType = req.query.activity_type;
+        const activityStatus = req.query.activity_status;
         const params = [limit];
         let projectFilter = '';
+        let paramIndex = 2; // Start from 2 since limit is $1
         
         if (projectId && projectId !== 'all') {
             projectFilter = 'AND projectid = $2';
             params.push(projectId);
+            paramIndex++;
+        }
+        
+        if (activityType && activityType !== '') {
+            projectFilter += ` AND activitytype = $${paramIndex}`;
+            params.push(activityType);
+            paramIndex++;
+        }
+        
+        if (activityStatus && activityStatus !== '') {
+            projectFilter += ` AND activitystatus = $${paramIndex}`;
+            params.push(activityStatus);
+            paramIndex++;
+        } else {
+            // If no activity status filter is applied, use the default filter
+            projectFilter += ` AND activitystatus IN ('Active', 'NotStart')`;
         }
 
         const query = `
@@ -4000,7 +6910,6 @@ app.get('/api/schedule/riding-data-date', async (req, res) => {
                 ridingdatadate as "Riding Data Date"
             FROM activityanalysisview
             WHERE ridingdatadate = 'Riding Data Date'
-            AND activitystatus IN ('Active', 'NotStart')
             ${projectFilter}
             ORDER BY activityid ASC
             LIMIT $1
@@ -4025,35 +6934,9 @@ app.get('/api/test-db', async (req, res) => {
     }
 });
 
-// Fallback route for SPA
-app.get('*', (req, res) => {
-  // Don't serve index.html for API routes
-  if (req.path.startsWith('/api/')) {
-    return res.status(404).json({ error: 'API endpoint not found' });
-  }
-  
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
 
-// Start the server
-app.listen(PORT, () => {
-  console.log(`[Server] Backend server running at http://localhost:${PORT}`);
-  console.log(`[Server] Using PostgreSQL database`);
-  console.log(`[Server] API routes available at: http://localhost:${PORT}/api/`);
-  console.log(`[Server] Health check: http://localhost:${PORT}/api/health`);
-});
 
-// Graceful shutdown
-process.on('SIGINT', () => {
-  console.log('[Server] SIGINT signal received: closing PostgreSQL database connection.');
-  db.end().then(() => {
-    console.log('[Server] Closed the database connection.');
-    process.exit(0);
-  }).catch((err) => {
-    console.error('[Server] Error closing database connection:', err.message);
-    process.exit(1);
-  });
-});
+
 
 // Resources KPI endpoint
 app.get('/api/schedule/resources-kpi', async (req, res) => {
@@ -4061,52 +6944,77 @@ app.get('/api/schedule/resources-kpi', async (req, res) => {
         console.log('🚀 RESOURCES KPI ENDPOINT CALLED - DEBUG TEST');
         console.log('🚀 RESOURCES KPI ENDPOINT CALLED');
         const projectId = req.query.project_id;
+        const activityType = req.query.activity_type;
+        const activityStatus = req.query.activity_status;
         console.log('📊 Fetching resources KPI data for project:', projectId);
         const params = [];
         let projectFilter = '';
+        let paramIndex = 1;
         
         console.log('🔍 Starting Resources KPI calculation...');
         
         if (projectId && projectId !== 'all') {
-            projectFilter = 'WHERE projectid = $1';
+            projectFilter = 'projectid = $1';
             params.push(projectId);
+            paramIndex++;
+        }
+        
+        if (activityType && activityType !== '') {
+            if (projectFilter === '') {
+                projectFilter = 'activitytype = $1';
+            } else {
+                projectFilter += ` AND activitytype = $${paramIndex}`;
+            }
+            params.push(activityType);
+            paramIndex++;
+        }
+        
+        if (activityStatus && activityStatus !== '') {
+            if (projectFilter === '') {
+                projectFilter = 'activitystatus = $1';
+            } else {
+                projectFilter += ` AND activitystatus = $${paramIndex}`;
+            }
+            params.push(activityStatus);
+            paramIndex++;
+        } else {
+            if (projectFilter === '') {
+                projectFilter = 'activitystatus IN (\'Active\', \'NotStart\')';
+            } else {
+                projectFilter += ` AND activitystatus IN ('Active', 'NotStart')`;
+            }
         }
 
         // Get Resource Load Count and Remaining Activities
         console.log('🔍 Building query with projectFilter:', projectFilter);
         
         const query = `
-            WITH metrics AS (
                 SELECT 
                     COUNT(*) FILTER (
-                        WHERE activitystatus IN ('Active', 'NotStart')
-                        AND resource IS NOT NULL 
+                    WHERE resource IS NOT NULL 
+                    AND resource != ''
+                    AND resource != ' '
+                ) as "ResourceLoad_Count",
+                COUNT(*) as "Remaining_Activities",
+                CASE 
+                    WHEN COUNT(*) = 0 THEN 0 
+                    ELSE TRUNC((COUNT(*) FILTER (
+                        WHERE resource IS NOT NULL 
                         AND resource != ''
                         AND resource != ' '
-                    ) as resource_load_count,
-                    COUNT(*) FILTER (
-                        WHERE activitystatus != 'Complete'
-                    ) as remaining_activities
-                FROM activityanalysisview
-                ${projectFilter}
-            )
-            SELECT 
-                resource_load_count as "ResourceLoad_Count",
-                remaining_activities as "Remaining_Activities",
-                CASE 
-                    WHEN remaining_activities = 0 THEN 0 
-                    ELSE TRUNC((resource_load_count::numeric / remaining_activities::numeric) * 100, 1)
+                    )::numeric / COUNT(*)::numeric) * 100, 1)
                 END as "Resource_Load_Percentage"
-            FROM metrics;`;
+            FROM activityanalysisview
+            ${projectFilter ? ` WHERE ${projectFilter}` : ''}`;
 
         console.log('🔍 About to execute query...');
         console.log('Executing query:', query);
         console.log('Query parameters:', params);
         
         try {
-            const result = await db.query(query, params);
+        const result = await db.query(query, params);
             console.log('Query executed successfully');
-            console.log('Query result:', result.rows[0]);
+        console.log('Query result:', result.rows[0]);
             
             // Debug: Check if we're getting the expected data
             if (!result.rows[0]) {
@@ -4120,7 +7028,7 @@ app.get('/api/schedule/resources-kpi', async (req, res) => {
             }
             
             console.log('Sending response:', result.rows[0]);
-            res.json(result.rows[0]);
+        res.json(result.rows[0]);
         } catch (dbError) {
             console.error('Database query error:', dbError);
             res.status(500).json({ error: 'Database query failed' });
@@ -4135,12 +7043,42 @@ app.get('/api/schedule/resources-kpi', async (req, res) => {
 app.get('/api/schedule/resources-chart-data', async (req, res) => {
     try {
         const projectId = req.query.project_id;
+        const activityType = req.query.activity_type;
+        const activityStatus = req.query.activity_status;
         const params = [];
         let projectFilter = '';
+        let paramIndex = 1;
         
         if (projectId && projectId !== 'all') {
-            projectFilter = 'WHERE projectid = $1';
+            projectFilter = 'projectid = $1';
             params.push(projectId);
+            paramIndex++;
+        }
+        
+        if (activityType && activityType !== '') {
+            if (projectFilter === '') {
+                projectFilter = 'activitytype = $1';
+            } else {
+                projectFilter += ` AND activitytype = $${paramIndex}`;
+            }
+            params.push(activityType);
+            paramIndex++;
+        }
+        
+        if (activityStatus && activityStatus !== '') {
+            if (projectFilter === '') {
+                projectFilter = 'activitystatus = $1';
+            } else {
+                projectFilter += ` AND activitystatus = $${paramIndex}`;
+            }
+            params.push(activityStatus);
+            paramIndex++;
+        } else {
+            if (projectFilter === '') {
+                projectFilter = 'activitystatus IN (\'Active\', \'NotStart\')';
+            } else {
+                projectFilter += ` AND activitystatus IN ('Active', 'NotStart')`;
+            }
         }
 
         const query = `
@@ -4152,12 +7090,15 @@ app.get('/api/schedule/resources-chart-data', async (req, res) => {
             FROM activityanalysisview
             WHERE resource IS NOT NULL 
             AND totalfloatdays <= 15
-            AND activitystatus IN ('Active', 'NotStart')
-            ${projectFilter ? 'AND ' + projectFilter.substring(6) : ''}
+            ${projectFilter ? ` AND ${projectFilter}` : ''}
             GROUP BY resource, totalfloatdays, activitystatus
             ORDER BY resource, totalfloatdays;`;
 
+        console.log('[Resources Chart] Query:', query);
+        console.log('[Resources Chart] Params:', params);
+
         const result = await db.query(query, params);
+        console.log('[Resources Chart] Result count:', result.rows.length);
         res.json(result.rows);
     } catch (error) {
         console.error('Error fetching resources chart data:', error);
@@ -4169,36 +7110,64 @@ app.get('/api/schedule/resources-chart-data', async (req, res) => {
 app.get('/api/schedule/resources-percentage-history', async (req, res) => {
     try {
         const projectId = req.query.project_id;
+        const activityType = req.query.activity_type;
+        const activityStatus = req.query.activity_status;
+        
+        let query = `
+            SELECT 
+                TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM') as date,
+                p.proj_id as project_id,
+                COUNT(CASE WHEN a.resource IS NOT NULL AND a.resource != '' AND a.resource != ' ' THEN 1 END) as resource_load_count,
+                COUNT(*) as total_count,
+                CASE 
+                    WHEN COUNT(*) > 0 THEN ROUND(CAST(COUNT(CASE WHEN a.resource IS NOT NULL AND a.resource != '' AND a.resource != ' ' THEN 1 END) AS NUMERIC) * 100.0 / COUNT(*), 1)
+                    ELSE 0 
+                END as percentage
+            FROM activityanalysisview a
+            INNER JOIN project p ON a.projectid = p.proj_id
+            WHERE p.last_recalc_date IS NOT NULL
+        `;
+        
         const params = [];
-        let projectFilter = '';
+        let paramIndex = 1;
         
         if (projectId && projectId !== 'all') {
-            projectFilter = 'AND p.projectid = $1';
+            query += ` AND a.projectid = $${paramIndex}`;
             params.push(projectId);
+            paramIndex++;
         }
+        
+        if (activityType && activityType !== '') {
+            query += ` AND a.activitytype = $${paramIndex}`;
+            params.push(activityType);
+            paramIndex++;
+        }
+        
+        if (activityStatus && activityStatus !== '') {
+            query += ` AND a.activitystatus = $${paramIndex}`;
+            params.push(activityStatus);
+            paramIndex++;
+        } else {
+            query += ` AND a.activitystatus IN ('Active', 'NotStart')`;
+        }
+        
+        query += `
+            GROUP BY p.last_recalc_date::DATE, p.proj_id
+            ORDER BY date ASC, project_id ASC
+        `;
 
-        const query = `
-            WITH monthly_metrics AS (
-                SELECT 
-                    TO_CHAR(p.last_recalc_date, 'YYYY-MM-DD') as monthyear,
-                    COUNT(DISTINCT a.resource) as resource_load_count,
-                    COUNT(*) FILTER (WHERE a.activitystatus != 'Complete') as remaining_activities
-                FROM project p
-                LEFT JOIN activityanalysisview a ON a.projectid = p.projectid
-                WHERE p.last_recalc_date IS NOT NULL ${projectFilter}
-                GROUP BY p.last_recalc_date
-                ORDER BY p.last_recalc_date
-            )
-            SELECT 
-                monthyear as date,
-                CASE 
-                    WHEN remaining_activities = 0 THEN 0
-                    ELSE TRUNC((resource_load_count::numeric / remaining_activities::numeric) * 100, 1)
-                END as value
-            FROM monthly_metrics;`;
+        console.log('[Resources History] Query:', query);
+        console.log('[Resources History] Params:', params);
 
         const result = await db.query(query, params);
-        res.json(result.rows);
+        console.log('[Resources History] Result:', result.rows);
+
+        const transformedData = result.rows.map(row => ({
+            date: row.date,
+            percentage: parseFloat(row.percentage) || 0
+        }));
+
+        res.json(transformedData);
     } catch (error) {
         console.error('Error fetching resources percentage history:', error);
         res.status(500).json({ error: 'Internal server error' });
@@ -4209,13 +7178,43 @@ app.get('/api/schedule/resources-percentage-history', async (req, res) => {
 app.get('/api/schedule/resources', async (req, res) => {
     try {
         const projectId = req.query.project_id;
+        const activityType = req.query.activity_type;
+        const activityStatus = req.query.activity_status;
         const limit = req.query.limit || 20;
         const params = [limit];
         let projectFilter = '';
+        let paramIndex = 2;
         
         if (projectId && projectId !== 'all') {
-            projectFilter = 'AND projectid = $2';
+            projectFilter = 'projectid = $2';
             params.push(projectId);
+            paramIndex++;
+        }
+        
+        if (activityType && activityType !== '') {
+            if (projectFilter === '') {
+                projectFilter = 'activitytype = $2';
+            } else {
+                projectFilter += ` AND activitytype = $${paramIndex}`;
+            }
+            params.push(activityType);
+            paramIndex++;
+        }
+        
+        if (activityStatus && activityStatus !== '') {
+            if (projectFilter === '') {
+                projectFilter = 'activitystatus = $2';
+            } else {
+                projectFilter += ` AND activitystatus = $${paramIndex}`;
+            }
+            params.push(activityStatus);
+            paramIndex++;
+        } else {
+            if (projectFilter === '') {
+                projectFilter = 'activitystatus IN (\'Active\', \'NotStart\')';
+            } else {
+                projectFilter += ` AND activitystatus IN ('Active', 'NotStart')`;
+            }
         }
 
         const query = `
@@ -4231,13 +7230,16 @@ app.get('/api/schedule/resources', async (req, res) => {
                 activitystatus as "Activity Status",
                 resource as "Resource"
             FROM activityanalysisview
-            WHERE activitystatus IN ('Active', 'NotStart')
-            AND resource IS NOT NULL
-            ${projectFilter}
+            WHERE resource IS NOT NULL
+            ${projectFilter ? ` AND ${projectFilter}` : ''}
             ORDER BY "Activity ID"
             LIMIT $1;`;
 
+        console.log('[Resources Table] Query:', query);
+        console.log('[Resources Table] Params:', params);
+
         const result = await db.query(query, params);
+        console.log('[Resources Table] Result count:', result.rows.length);
         res.json(result.rows);
     } catch (error) {
         console.error('Error fetching resources table data:', error);
@@ -4369,4 +7371,34 @@ app.get('/api/schedule/non-fs-relationship-metrics', async (req, res) => {
         console.error('Detailed error:', error.stack);
         res.status(500).json({ error: 'Failed to fetch Non-FS Relationship Metrics data' });
     }
+});
+
+// Fallback route for SPA
+app.get('*', (req, res) => {
+  // Don't serve index.html for API routes
+  if (req.path.startsWith('/api/')) {
+    return res.status(404).json({ error: 'API endpoint not found' });
+  }
+  
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Start the server
+app.listen(PORT, () => {
+  console.log(`[Server] Backend server running at http://localhost:${PORT}`);
+  console.log(`[Server] Using PostgreSQL database`);
+  console.log(`[Server] API routes available at: http://localhost:${PORT}/api/`);
+  console.log(`[Server] Health check: http://localhost:${PORT}/api/health`);
+});
+
+// Graceful shutdown
+process.on('SIGINT', () => {
+  console.log('[Server] SIGINT signal received: closing PostgreSQL database connection.');
+  db.end().then(() => {
+    console.log('[Server] Closed the database connection.');
+    process.exit(0);
+  }).catch((err) => {
+    console.error('[Server] Error closing database connection:', err.message);
+    process.exit(1);
+  });
 });

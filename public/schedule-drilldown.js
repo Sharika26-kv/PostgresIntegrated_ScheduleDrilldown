@@ -215,8 +215,782 @@ function selectMetric(metric) {
     document.getElementById('metric-content').classList.remove('hidden');
     document.getElementById('initial-message').classList.add('hidden');
     
+    // Handle metric-specific filters
+    setupMetricFilters(metric);
+    
     currentMetric = metric;
     loadMetricData(metric);
+}
+
+// Function to setup metric-specific filters
+function setupMetricFilters(metric) {
+    // Hide all filter containers
+    document.querySelectorAll('[id$="-filters"]').forEach(container => {
+        container.style.display = 'none';
+    });
+    
+    // Hide the main filter container
+    document.getElementById('metricFilters').style.display = 'none';
+    
+    // Show filters based on metric
+    if (metric === 'open-ends') {
+        document.getElementById('metricFilters').style.display = 'flex';
+        document.getElementById('open-ends-filters').style.display = 'flex';
+        loadOpenEndsFilters();
+    } else if (metric === 'constraints') {
+        document.getElementById('metricFilters').style.display = 'flex';
+        document.getElementById('constraints-filters').style.display = 'flex';
+        loadConstraintsFilters();
+    } else if (metric === 'excessive-durations') {
+        document.getElementById('metricFilters').style.display = 'flex';
+        document.getElementById('excessive-durations-filters').style.display = 'flex';
+        loadExcessiveDurationsFilters();
+    } else if (metric === 'negative-float') {
+        document.getElementById('metricFilters').style.display = 'flex';
+        document.getElementById('negative-float-filters').style.display = 'flex';
+        loadNegativeFloatFilters();
+    } else if (metric === 'critical-float') {
+        document.getElementById('metricFilters').style.display = 'flex';
+        document.getElementById('critical-float-filters').style.display = 'flex';
+        loadCriticalFloatFilters();
+    } else if (metric === 'excessive-float') {
+        document.getElementById('metricFilters').style.display = 'flex';
+        document.getElementById('excessive-float-filters').style.display = 'flex';
+        loadExcessiveFloatFilters();
+    } else if (metric === 'riding-data-date') {
+        document.getElementById('metricFilters').style.display = 'flex';
+        document.getElementById('riding-dates-filters').style.display = 'flex';
+        loadRidingDatesFilters();
+    } else if (metric === 'invalid-dates') {
+        document.getElementById('metricFilters').style.display = 'flex';
+        document.getElementById('invalid-dates-filters').style.display = 'flex';
+        loadInvalidDatesFilters();
+    } else if (metric === 'resources') {
+        document.getElementById('metricFilters').style.display = 'flex';
+        document.getElementById('resources-filters').style.display = 'flex';
+        loadResourcesFilters();
+    } else if (metric === 'fs') {
+        document.getElementById('metricFilters').style.display = 'flex';
+        document.getElementById('fs-filters').style.display = 'flex';
+        loadFSFilters();
+    } else if (metric === 'non-fs') {
+        document.getElementById('metricFilters').style.display = 'flex';
+        document.getElementById('non-fs-filters').style.display = 'flex';
+        loadNonFSFilters();
+    } else if (metric === 'leads') {
+        document.getElementById('metricFilters').style.display = 'flex';
+        document.getElementById('leads-filters').style.display = 'flex';
+        loadLeadsFilters();
+    } else if (metric === 'lags') {
+        document.getElementById('metricFilters').style.display = 'flex';
+        document.getElementById('lags-filters').style.display = 'flex';
+        loadLagsFilters();
+    } else if (metric === 'excessive-lags') {
+        document.getElementById('metricFilters').style.display = 'flex';
+        document.getElementById('excessive-lags-filters').style.display = 'flex';
+        loadExcessiveLagsFilters();
+    }
+    // Add other metrics here as we implement them
+}
+
+// Function to load Open Ends filters
+async function loadOpenEndsFilters() {
+    try {
+        const projectId = currentProjectId || '';
+        
+        // Load activity type filters
+        const activityTypeResponse = await fetch(`${API_BASE}/api/schedule/open-ends-activity-type-filters?project_id=${projectId}`);
+        const activityTypes = await activityTypeResponse.json();
+        
+        const activityTypeSelect = document.getElementById('activityTypeFilter');
+        activityTypeSelect.innerHTML = '<option value="">All Types</option>';
+        activityTypes.forEach(type => {
+            const option = document.createElement('option');
+            option.value = type;
+            option.textContent = type;
+            activityTypeSelect.appendChild(option);
+        });
+        
+        // Load activity status filters
+        const activityStatusResponse = await fetch(`${API_BASE}/api/schedule/open-ends-activity-status-filters?project_id=${projectId}`);
+        const activityStatuses = await activityStatusResponse.json();
+        
+        const activityStatusSelect = document.getElementById('activityStatusFilter');
+        activityStatusSelect.innerHTML = '<option value="">All Statuses</option>';
+        activityStatuses.forEach(status => {
+            const option = document.createElement('option');
+            option.value = status;
+            option.textContent = status;
+            activityStatusSelect.appendChild(option);
+        });
+        
+        // Add event listeners for filter changes
+        activityTypeSelect.onchange = () => loadMetricData('open-ends');
+        activityStatusSelect.onchange = () => loadMetricData('open-ends');
+        
+    } catch (error) {
+        console.error('Error loading Open Ends filters:', error);
+    }
+}
+
+// Function to load Constraints filters
+async function loadConstraintsFilters() {
+    try {
+        const projectId = currentProjectId || '';
+        
+        // Load activity type filters
+        const activityTypeResponse = await fetch(`${API_BASE}/api/schedule/constraints-activity-type-filters?project_id=${projectId}`);
+        const activityTypes = await activityTypeResponse.json();
+        
+        const activityTypeSelect = document.getElementById('constraintsActivityTypeFilter');
+        activityTypeSelect.innerHTML = '<option value="">All Types</option>';
+        activityTypes.forEach(type => {
+            const option = document.createElement('option');
+            option.value = type;
+            option.textContent = type;
+            activityTypeSelect.appendChild(option);
+        });
+        
+        // Load activity status filters
+        const activityStatusResponse = await fetch(`${API_BASE}/api/schedule/constraints-activity-status-filters?project_id=${projectId}`);
+        const activityStatuses = await activityStatusResponse.json();
+        
+        const activityStatusSelect = document.getElementById('constraintsActivityStatusFilter');
+        activityStatusSelect.innerHTML = '<option value="">All Statuses</option>';
+        activityStatuses.forEach(status => {
+            const option = document.createElement('option');
+            option.value = status;
+            option.textContent = status;
+            activityStatusSelect.appendChild(option);
+        });
+        
+        // Add event listeners for filter changes
+        activityTypeSelect.onchange = () => loadMetricData('constraints');
+        activityStatusSelect.onchange = () => loadMetricData('constraints');
+        
+    } catch (error) {
+        console.error('Error loading Constraints filters:', error);
+    }
+}
+
+// Function to load Excessive Durations filters
+async function loadExcessiveDurationsFilters() {
+    try {
+        const projectId = currentProjectId || '';
+        
+        // Load activity type filters
+        const activityTypeResponse = await fetch(`${API_BASE}/api/schedule/excessive-durations-activity-type-filters?project_id=${projectId}`);
+        const activityTypes = await activityTypeResponse.json();
+        
+        const activityTypeSelect = document.getElementById('excessiveDurationsActivityTypeFilter');
+        activityTypeSelect.innerHTML = '<option value="">All Types</option>';
+        activityTypes.forEach(type => {
+            const option = document.createElement('option');
+            option.value = type;
+            option.textContent = type;
+            activityTypeSelect.appendChild(option);
+        });
+        
+        // Load activity status filters
+        const activityStatusResponse = await fetch(`${API_BASE}/api/schedule/excessive-durations-activity-status-filters?project_id=${projectId}`);
+        const activityStatuses = await activityStatusResponse.json();
+        
+        const activityStatusSelect = document.getElementById('excessiveDurationsActivityStatusFilter');
+        activityStatusSelect.innerHTML = '<option value="">All Statuses</option>';
+        activityStatuses.forEach(status => {
+            const option = document.createElement('option');
+            option.value = status;
+            option.textContent = status;
+            activityStatusSelect.appendChild(option);
+        });
+        
+        // Add event listeners for filter changes
+        activityTypeSelect.onchange = () => loadMetricData('excessive-durations');
+        activityStatusSelect.onchange = () => loadMetricData('excessive-durations');
+        
+    } catch (error) {
+        console.error('Error loading Excessive Durations filters:', error);
+    }
+}
+
+// Function to load Negative Total Float filters
+async function loadNegativeFloatFilters() {
+    try {
+        const projectId = currentProjectId || '';
+        
+        // Load activity type filters
+        const activityTypeResponse = await fetch(`${API_BASE}/api/schedule/negative-float-activity-type-filters?project_id=${projectId}`);
+        const activityTypes = await activityTypeResponse.json();
+        
+        const activityTypeSelect = document.getElementById('negativeFloatActivityTypeFilter');
+        activityTypeSelect.innerHTML = '<option value="">All Types</option>';
+        activityTypes.forEach(type => {
+            const option = document.createElement('option');
+            option.value = type;
+            option.textContent = type;
+            activityTypeSelect.appendChild(option);
+        });
+        
+        // Load activity status filters
+        const activityStatusResponse = await fetch(`${API_BASE}/api/schedule/negative-float-activity-status-filters?project_id=${projectId}`);
+        const activityStatuses = await activityStatusResponse.json();
+        
+        const activityStatusSelect = document.getElementById('negativeFloatActivityStatusFilter');
+        activityStatusSelect.innerHTML = '<option value="">All Statuses</option>';
+        activityStatuses.forEach(status => {
+            const option = document.createElement('option');
+            option.value = status;
+            option.textContent = status;
+            activityStatusSelect.appendChild(option);
+        });
+        
+        // Add event listeners for filter changes
+        activityTypeSelect.onchange = () => loadMetricData('negative-float');
+        activityStatusSelect.onchange = () => loadMetricData('negative-float');
+        
+    } catch (error) {
+        console.error('Error loading Negative Total Float filters:', error);
+    }
+}
+
+// Function to load Critical Total Float filters
+async function loadCriticalFloatFilters() {
+    try {
+        const projectId = currentProjectId || '';
+        
+        // Load activity type filters
+        const activityTypeResponse = await fetch(`${API_BASE}/api/schedule/critical-float-activity-type-filters?project_id=${projectId}`);
+        const activityTypes = await activityTypeResponse.json();
+        
+        const activityTypeSelect = document.getElementById('criticalFloatActivityTypeFilter');
+        activityTypeSelect.innerHTML = '<option value="">All Types</option>';
+        activityTypes.forEach(type => {
+            const option = document.createElement('option');
+            option.value = type;
+            option.textContent = type;
+            activityTypeSelect.appendChild(option);
+        });
+        
+        // Load activity status filters
+        const activityStatusResponse = await fetch(`${API_BASE}/api/schedule/critical-float-activity-status-filters?project_id=${projectId}`);
+        const activityStatuses = await activityStatusResponse.json();
+        
+        const activityStatusSelect = document.getElementById('criticalFloatActivityStatusFilter');
+        activityStatusSelect.innerHTML = '<option value="">All Statuses</option>';
+        activityStatuses.forEach(status => {
+            const option = document.createElement('option');
+            option.value = status;
+            option.textContent = status;
+            activityStatusSelect.appendChild(option);
+        });
+        
+        // Add event listeners for filter changes
+        activityTypeSelect.onchange = () => loadMetricData('critical-float');
+        activityStatusSelect.onchange = () => loadMetricData('critical-float');
+        
+    } catch (error) {
+        console.error('Error loading Critical Total Float filters:', error);
+    }
+}
+
+// Function to load Excessive Total Float filters
+async function loadExcessiveFloatFilters() {
+    try {
+        const projectId = currentProjectId || '';
+        
+        // Load activity type filters
+        const activityTypeResponse = await fetch(`${API_BASE}/api/schedule/excessive-float-activity-type-filters?project_id=${projectId}`);
+        const activityTypes = await activityTypeResponse.json();
+        
+        const activityTypeSelect = document.getElementById('excessiveFloatActivityTypeFilter');
+        activityTypeSelect.innerHTML = '<option value="">All Types</option>';
+        activityTypes.forEach(type => {
+            const option = document.createElement('option');
+            option.value = type;
+            option.textContent = type;
+            activityTypeSelect.appendChild(option);
+        });
+        
+        // Load activity status filters
+        const activityStatusResponse = await fetch(`${API_BASE}/api/schedule/excessive-float-activity-status-filters?project_id=${projectId}`);
+        const activityStatuses = await activityStatusResponse.json();
+        
+        const activityStatusSelect = document.getElementById('excessiveFloatActivityStatusFilter');
+        activityStatusSelect.innerHTML = '<option value="">All Statuses</option>';
+        activityStatuses.forEach(status => {
+            const option = document.createElement('option');
+            option.value = status;
+            option.textContent = status;
+            activityStatusSelect.appendChild(option);
+        });
+        
+        // Add event listeners for filter changes
+        activityTypeSelect.onchange = () => loadMetricData('excessive-float');
+        activityStatusSelect.onchange = () => loadMetricData('excessive-float');
+        
+    } catch (error) {
+        console.error('Error loading Excessive Total Float filters:', error);
+    }
+}
+
+// Function to load Riding Data Dates filters
+async function loadRidingDatesFilters() {
+    try {
+        const projectId = currentProjectId || '';
+        
+        // Load activity type filters
+        const activityTypeResponse = await fetch(`${API_BASE}/api/schedule/riding-dates-activity-type-filters?project_id=${projectId}`);
+        const activityTypes = await activityTypeResponse.json();
+        
+        const activityTypeSelect = document.getElementById('ridingDatesActivityTypeFilter');
+        activityTypeSelect.innerHTML = '<option value="">All Types</option>';
+        activityTypes.forEach(type => {
+            const option = document.createElement('option');
+            option.value = type;
+            option.textContent = type;
+            activityTypeSelect.appendChild(option);
+        });
+        
+        // Load activity status filters
+        const activityStatusResponse = await fetch(`${API_BASE}/api/schedule/riding-dates-activity-status-filters?project_id=${projectId}`);
+        const activityStatuses = await activityStatusResponse.json();
+        
+        const activityStatusSelect = document.getElementById('ridingDatesActivityStatusFilter');
+        activityStatusSelect.innerHTML = '<option value="">All Statuses</option>';
+        activityStatuses.forEach(status => {
+            const option = document.createElement('option');
+            option.value = status;
+            option.textContent = status;
+            activityStatusSelect.appendChild(option);
+        });
+        
+        // Add event listeners for filter changes
+        activityTypeSelect.onchange = () => loadMetricData('riding-data-date');
+        activityStatusSelect.onchange = () => loadMetricData('riding-data-date');
+        
+    } catch (error) {
+        console.error('Error loading Riding Data Dates filters:', error);
+    }
+}
+
+// Function to load Invalid Dates filters
+async function loadInvalidDatesFilters() {
+    try {
+        const projectId = currentProjectId || '';
+        
+        // Load activity type filters
+        const activityTypeResponse = await fetch(`${API_BASE}/api/schedule/invalid-dates-activity-type-filters?project_id=${projectId}`);
+        const activityTypes = await activityTypeResponse.json();
+        
+        const activityTypeSelect = document.getElementById('invalidDatesActivityTypeFilter');
+        activityTypeSelect.innerHTML = '<option value="">All Types</option>';
+        activityTypes.forEach(type => {
+            const option = document.createElement('option');
+            option.value = type;
+            option.textContent = type;
+            activityTypeSelect.appendChild(option);
+        });
+        
+        // Load activity status filters
+        const activityStatusResponse = await fetch(`${API_BASE}/api/schedule/invalid-dates-activity-status-filters?project_id=${projectId}`);
+        const activityStatuses = await activityStatusResponse.json();
+        
+        const activityStatusSelect = document.getElementById('invalidDatesActivityStatusFilter');
+        activityStatusSelect.innerHTML = '<option value="">All Statuses</option>';
+        activityStatuses.forEach(status => {
+            const option = document.createElement('option');
+            option.value = status;
+            option.textContent = status;
+            activityStatusSelect.appendChild(option);
+        });
+        
+        // Add event listeners for filter changes
+        activityTypeSelect.onchange = () => loadMetricData('invalid-dates');
+        activityStatusSelect.onchange = () => loadMetricData('invalid-dates');
+        
+    } catch (error) {
+        console.error('Error loading Invalid Dates filters:', error);
+    }
+}
+
+// Function to load Resources filters
+async function loadResourcesFilters() {
+    try {
+        const projectId = currentProjectId || '';
+        
+        // Load activity type filters
+        const activityTypeResponse = await fetch(`${API_BASE}/api/schedule/resources-activity-type-filters?project_id=${projectId}`);
+        const activityTypes = await activityTypeResponse.json();
+        
+        const activityTypeSelect = document.getElementById('resourcesActivityTypeFilter');
+        activityTypeSelect.innerHTML = '<option value="">All Types</option>';
+        activityTypes.forEach(type => {
+            const option = document.createElement('option');
+            option.value = type;
+            option.textContent = type;
+            activityTypeSelect.appendChild(option);
+        });
+        
+        // Load activity status filters
+        const activityStatusResponse = await fetch(`${API_BASE}/api/schedule/resources-activity-status-filters?project_id=${projectId}`);
+        const activityStatuses = await activityStatusResponse.json();
+        
+        const activityStatusSelect = document.getElementById('resourcesActivityStatusFilter');
+        activityStatusSelect.innerHTML = '<option value="">All Statuses</option>';
+        activityStatuses.forEach(status => {
+            const option = document.createElement('option');
+            option.value = status;
+            option.textContent = status;
+            activityStatusSelect.appendChild(option);
+        });
+        
+        // Add event listeners for filter changes
+        activityTypeSelect.onchange = () => loadMetricData('resources');
+        activityStatusSelect.onchange = () => loadMetricData('resources');
+        
+    } catch (error) {
+        console.error('Error loading Resources filters:', error);
+    }
+}
+
+// Function to load FS+0d Lag filters
+async function loadFSFilters() {
+    try {
+        const projectId = currentProjectId || '';
+        
+        // Load relationship type filters
+        const relationshipTypeResponse = await fetch(`${API_BASE}/api/schedule/fs-relationship-type-filters?project_id=${projectId}`);
+        const relationshipTypes = await relationshipTypeResponse.json();
+        
+        const relationshipTypeSelect = document.getElementById('fsRelationshipTypeFilter');
+        relationshipTypeSelect.innerHTML = '<option value="">All Types</option>';
+        relationshipTypes.forEach(type => {
+            const option = document.createElement('option');
+            option.value = type;
+            option.textContent = type;
+            relationshipTypeSelect.appendChild(option);
+        });
+        
+        // Load lag filters
+        const lagResponse = await fetch(`${API_BASE}/api/schedule/fs-lag-filters?project_id=${projectId}`);
+        const lags = await lagResponse.json();
+        
+        const lagSelect = document.getElementById('fsLagFilter');
+        lagSelect.innerHTML = '<option value="">All Lags</option>';
+        lags.forEach(lag => {
+            const option = document.createElement('option');
+            option.value = lag;
+            option.textContent = lag;
+            lagSelect.appendChild(option);
+        });
+        
+        // Load free float filters
+        const freeFloatResponse = await fetch(`${API_BASE}/api/schedule/fs-free-float-filters?project_id=${projectId}`);
+        const freeFloats = await freeFloatResponse.json();
+        
+        const freeFloatSelect = document.getElementById('fsFreeFloatFilter');
+        freeFloatSelect.innerHTML = '<option value="">All Free Floats</option>';
+        freeFloats.forEach(freeFloat => {
+            const option = document.createElement('option');
+            option.value = freeFloat;
+            option.textContent = freeFloat;
+            freeFloatSelect.appendChild(option);
+        });
+        
+        // Load driving filters
+        const drivingResponse = await fetch(`${API_BASE}/api/schedule/fs-driving-filters?project_id=${projectId}`);
+        const drivings = await drivingResponse.json();
+        
+        const drivingSelect = document.getElementById('fsDrivingFilter');
+        drivingSelect.innerHTML = '<option value="">All Driving</option>';
+        drivings.forEach(driving => {
+            const option = document.createElement('option');
+            option.value = driving;
+            option.textContent = driving;
+            drivingSelect.appendChild(option);
+        });
+        
+        // Add event listeners for filter changes
+        relationshipTypeSelect.onchange = () => loadMetricData('fs');
+        lagSelect.onchange = () => loadMetricData('fs');
+        freeFloatSelect.onchange = () => loadMetricData('fs');
+        drivingSelect.onchange = () => loadMetricData('fs');
+        
+    } catch (error) {
+        console.error('Error loading FS filters:', error);
+    }
+}
+
+// Function to load Non-FS+0d Lag filters
+async function loadNonFSFilters() {
+    try {
+        const projectId = currentProjectId || '';
+        
+        // Load relationship type filters
+        const relationshipTypeResponse = await fetch(`${API_BASE}/api/schedule/non-fs-relationship-type-filters?project_id=${projectId}`);
+        const relationshipTypes = await relationshipTypeResponse.json();
+        
+        const relationshipTypeSelect = document.getElementById('nonFsRelationshipTypeFilter');
+        relationshipTypeSelect.innerHTML = '<option value="">All Types</option>';
+        relationshipTypes.forEach(type => {
+            const option = document.createElement('option');
+            option.value = type;
+            option.textContent = type;
+            relationshipTypeSelect.appendChild(option);
+        });
+        
+        // Load lag filters
+        const lagResponse = await fetch(`${API_BASE}/api/schedule/non-fs-lag-filters?project_id=${projectId}`);
+        const lags = await lagResponse.json();
+        
+        const lagSelect = document.getElementById('nonFsLagFilter');
+        lagSelect.innerHTML = '<option value="">All Lags</option>';
+        lags.forEach(lag => {
+            const option = document.createElement('option');
+            option.value = lag;
+            option.textContent = lag;
+            lagSelect.appendChild(option);
+        });
+        
+        // Load free float filters
+        const freeFloatResponse = await fetch(`${API_BASE}/api/schedule/non-fs-free-float-filters?project_id=${projectId}`);
+        const freeFloats = await freeFloatResponse.json();
+        
+        const freeFloatSelect = document.getElementById('nonFsFreeFloatFilter');
+        freeFloatSelect.innerHTML = '<option value="">All Free Floats</option>';
+        freeFloats.forEach(freeFloat => {
+            const option = document.createElement('option');
+            option.value = freeFloat;
+            option.textContent = freeFloat;
+            freeFloatSelect.appendChild(option);
+        });
+        
+        // Load driving filters
+        const drivingResponse = await fetch(`${API_BASE}/api/schedule/non-fs-driving-filters?project_id=${projectId}`);
+        const drivings = await drivingResponse.json();
+        
+        const drivingSelect = document.getElementById('nonFsDrivingFilter');
+        drivingSelect.innerHTML = '<option value="">All Driving</option>';
+        drivings.forEach(driving => {
+            const option = document.createElement('option');
+            option.value = driving;
+            option.textContent = driving;
+            drivingSelect.appendChild(option);
+        });
+        
+        // Add event listeners for filter changes
+        relationshipTypeSelect.onchange = () => loadMetricData('non-fs');
+        lagSelect.onchange = () => loadMetricData('non-fs');
+        freeFloatSelect.onchange = () => loadMetricData('non-fs');
+        drivingSelect.onchange = () => loadMetricData('non-fs');
+        
+    } catch (error) {
+        console.error('Error loading Non-FS filters:', error);
+    }
+}
+
+// Function to load Leads filters
+async function loadLeadsFilters() {
+    try {
+        const projectId = currentProjectId || '';
+        
+        // Load relationship type filters
+        const relationshipTypeResponse = await fetch(`${API_BASE}/api/schedule/leads-relationship-type-filters?project_id=${projectId}`);
+        const relationshipTypes = await relationshipTypeResponse.json();
+        
+        const relationshipTypeSelect = document.getElementById('leadsRelationshipTypeFilter');
+        relationshipTypeSelect.innerHTML = '<option value="">All Types</option>';
+        relationshipTypes.forEach(type => {
+            const option = document.createElement('option');
+            option.value = type;
+            option.textContent = type;
+            relationshipTypeSelect.appendChild(option);
+        });
+        
+        // Load lag filters
+        const lagResponse = await fetch(`${API_BASE}/api/schedule/leads-lag-filters?project_id=${projectId}`);
+        const lags = await lagResponse.json();
+        
+        const lagSelect = document.getElementById('leadsLagFilter');
+        lagSelect.innerHTML = '<option value="">All Lags</option>';
+        lags.forEach(lag => {
+            const option = document.createElement('option');
+            option.value = lag;
+            option.textContent = lag;
+            lagSelect.appendChild(option);
+        });
+        
+        // Load free float filters
+        const freeFloatResponse = await fetch(`${API_BASE}/api/schedule/leads-free-float-filters?project_id=${projectId}`);
+        const freeFloats = await freeFloatResponse.json();
+        
+        const freeFloatSelect = document.getElementById('leadsFreeFloatFilter');
+        freeFloatSelect.innerHTML = '<option value="">All Free Floats</option>';
+        freeFloats.forEach(freeFloat => {
+            const option = document.createElement('option');
+            option.value = freeFloat;
+            option.textContent = freeFloat;
+            freeFloatSelect.appendChild(option);
+        });
+        
+        // Load driving filters
+        const drivingResponse = await fetch(`${API_BASE}/api/schedule/leads-driving-filters?project_id=${projectId}`);
+        const drivings = await drivingResponse.json();
+        
+        const drivingSelect = document.getElementById('leadsDrivingFilter');
+        drivingSelect.innerHTML = '<option value="">All Driving</option>';
+        drivings.forEach(driving => {
+            const option = document.createElement('option');
+            option.value = driving;
+            option.textContent = driving;
+            drivingSelect.appendChild(option);
+        });
+        
+        // Add event listeners for filter changes
+        relationshipTypeSelect.onchange = () => loadMetricData('leads');
+        lagSelect.onchange = () => loadMetricData('leads');
+        freeFloatSelect.onchange = () => loadMetricData('leads');
+        drivingSelect.onchange = () => loadMetricData('leads');
+        
+    } catch (error) {
+        console.error('Error loading Leads filters:', error);
+    }
+}
+
+// Function to load Lags filters
+async function loadLagsFilters() {
+    try {
+        const projectId = currentProjectId || '';
+        
+        // Load relationship type filters
+        const relationshipTypeResponse = await fetch(`${API_BASE}/api/schedule/lags-relationship-type-filters?project_id=${projectId}`);
+        const relationshipTypes = await relationshipTypeResponse.json();
+        
+        const relationshipTypeSelect = document.getElementById('lagsRelationshipTypeFilter');
+        relationshipTypeSelect.innerHTML = '<option value="">All Types</option>';
+        relationshipTypes.forEach(type => {
+            const option = document.createElement('option');
+            option.value = type;
+            option.textContent = type;
+            relationshipTypeSelect.appendChild(option);
+        });
+        
+        // Load lag filters
+        const lagResponse = await fetch(`${API_BASE}/api/schedule/lags-lag-filters?project_id=${projectId}`);
+        const lags = await lagResponse.json();
+        
+        const lagSelect = document.getElementById('lagsLagFilter');
+        lagSelect.innerHTML = '<option value="">All Lags</option>';
+        lags.forEach(lag => {
+            const option = document.createElement('option');
+            option.value = lag;
+            option.textContent = lag;
+            lagSelect.appendChild(option);
+        });
+        
+        // Load free float filters
+        const freeFloatResponse = await fetch(`${API_BASE}/api/schedule/lags-free-float-filters?project_id=${projectId}`);
+        const freeFloats = await freeFloatResponse.json();
+        
+        const freeFloatSelect = document.getElementById('lagsFreeFloatFilter');
+        freeFloatSelect.innerHTML = '<option value="">All Free Floats</option>';
+        freeFloats.forEach(freeFloat => {
+            const option = document.createElement('option');
+            option.value = freeFloat;
+            option.textContent = freeFloat;
+            freeFloatSelect.appendChild(option);
+        });
+        
+        // Load driving filters
+        const drivingResponse = await fetch(`${API_BASE}/api/schedule/lags-driving-filters?project_id=${projectId}`);
+        const drivings = await drivingResponse.json();
+        
+        const drivingSelect = document.getElementById('lagsDrivingFilter');
+        drivingSelect.innerHTML = '<option value="">All Driving</option>';
+        drivings.forEach(driving => {
+            const option = document.createElement('option');
+            option.value = driving;
+            option.textContent = driving;
+            drivingSelect.appendChild(option);
+        });
+        
+        // Add event listeners for filter changes
+        relationshipTypeSelect.onchange = () => loadMetricData('lags');
+        lagSelect.onchange = () => loadMetricData('lags');
+        freeFloatSelect.onchange = () => loadMetricData('lags');
+        drivingSelect.onchange = () => loadMetricData('lags');
+        
+    } catch (error) {
+        console.error('Error loading Lags filters:', error);
+    }
+}
+
+// Function to load Excessive Lags filters
+async function loadExcessiveLagsFilters() {
+    try {
+        const projectId = currentProjectId || '';
+        
+        // Load relationship type filters
+        const relationshipTypeResponse = await fetch(`${API_BASE}/api/schedule/excessive-lags-relationship-type-filters?project_id=${projectId}`);
+        const relationshipTypes = await relationshipTypeResponse.json();
+        
+        const relationshipTypeSelect = document.getElementById('excessiveLagsRelationshipTypeFilter');
+        relationshipTypeSelect.innerHTML = '<option value="">All Types</option>';
+        relationshipTypes.forEach(type => {
+            const option = document.createElement('option');
+            option.value = type;
+            option.textContent = type;
+            relationshipTypeSelect.appendChild(option);
+        });
+        
+        // Load lag filters
+        const lagResponse = await fetch(`${API_BASE}/api/schedule/excessive-lags-lag-filters?project_id=${projectId}`);
+        const lags = await lagResponse.json();
+        
+        const lagSelect = document.getElementById('excessiveLagsLagFilter');
+        lagSelect.innerHTML = '<option value="">All Lags</option>';
+        lags.forEach(lag => {
+            const option = document.createElement('option');
+            option.value = lag;
+            option.textContent = lag;
+            lagSelect.appendChild(option);
+        });
+        
+        // Load free float filters
+        const freeFloatResponse = await fetch(`${API_BASE}/api/schedule/excessive-lags-free-float-filters?project_id=${projectId}`);
+        const freeFloats = await freeFloatResponse.json();
+        
+        const freeFloatSelect = document.getElementById('excessiveLagsFreeFloatFilter');
+        freeFloatSelect.innerHTML = '<option value="">All Free Floats</option>';
+        freeFloats.forEach(freeFloat => {
+            const option = document.createElement('option');
+            option.value = freeFloat;
+            option.textContent = freeFloat;
+            freeFloatSelect.appendChild(option);
+        });
+        
+        // Load driving filters
+        const drivingResponse = await fetch(`${API_BASE}/api/schedule/excessive-lags-driving-filters?project_id=${projectId}`);
+        const drivings = await drivingResponse.json();
+        
+        const drivingSelect = document.getElementById('excessiveLagsDrivingFilter');
+        drivingSelect.innerHTML = '<option value="">All Driving</option>';
+        drivings.forEach(driving => {
+            const option = document.createElement('option');
+            option.value = driving;
+            option.textContent = driving;
+            drivingSelect.appendChild(option);
+        });
+        
+        // Add event listeners for filter changes
+        relationshipTypeSelect.onchange = () => loadMetricData('excessive-lags');
+        lagSelect.onchange = () => loadMetricData('excessive-lags');
+        freeFloatSelect.onchange = () => loadMetricData('excessive-lags');
+        drivingSelect.onchange = () => loadMetricData('excessive-lags');
+        
+    } catch (error) {
+        console.error('Error loading Excessive Lags filters:', error);
+    }
 }
 
 async function loadMetricData(metric) {
@@ -247,9 +1021,120 @@ async function loadMetricData(metric) {
 
 async function fetchKPIData(metric) {
     const endpoint = getKPIEndpoint(metric);
-    const url = currentProjectId ? 
-        `${API_BASE}${endpoint}?project_id=${currentProjectId}` : 
-        `${API_BASE}${endpoint}`;
+    const params = new URLSearchParams();
+    
+    if (currentProjectId) {
+        params.append('project_id', currentProjectId);
+    }
+    
+    // Add metric-specific filters
+    if (metric === 'open-ends') {
+        const activityType = document.getElementById('activityTypeFilter')?.value;
+        const activityStatus = document.getElementById('activityStatusFilter')?.value;
+        
+        if (activityType) params.append('activity_type', activityType);
+        if (activityStatus) params.append('activity_status', activityStatus);
+    } else if (metric === 'constraints') {
+        const activityType = document.getElementById('constraintsActivityTypeFilter')?.value;
+        const activityStatus = document.getElementById('constraintsActivityStatusFilter')?.value;
+        
+        if (activityType) params.append('activity_type', activityType);
+        if (activityStatus) params.append('activity_status', activityStatus);
+    } else if (metric === 'excessive-durations') {
+        const activityType = document.getElementById('excessiveDurationsActivityTypeFilter')?.value;
+        const activityStatus = document.getElementById('excessiveDurationsActivityStatusFilter')?.value;
+        
+        if (activityType) params.append('activity_type', activityType);
+        if (activityStatus) params.append('activity_status', activityStatus);
+    } else if (metric === 'negative-float') {
+        const activityType = document.getElementById('negativeFloatActivityTypeFilter')?.value;
+        const activityStatus = document.getElementById('negativeFloatActivityStatusFilter')?.value;
+        
+        if (activityType) params.append('activity_type', activityType);
+        if (activityStatus) params.append('activity_status', activityStatus);
+    } else if (metric === 'critical-float') {
+        const activityType = document.getElementById('criticalFloatActivityTypeFilter')?.value;
+        const activityStatus = document.getElementById('criticalFloatActivityStatusFilter')?.value;
+        
+        if (activityType) params.append('activity_type', activityType);
+        if (activityStatus) params.append('activity_status', activityStatus);
+    } else if (metric === 'excessive-float') {
+        const activityType = document.getElementById('excessiveFloatActivityTypeFilter')?.value;
+        const activityStatus = document.getElementById('excessiveFloatActivityStatusFilter')?.value;
+        
+        if (activityType) params.append('activity_type', activityType);
+        if (activityStatus) params.append('activity_status', activityStatus);
+    } else if (metric === 'riding-data-date') {
+        const activityType = document.getElementById('ridingDatesActivityTypeFilter')?.value;
+        const activityStatus = document.getElementById('ridingDatesActivityStatusFilter')?.value;
+        
+        if (activityType) params.append('activity_type', activityType);
+        if (activityStatus) params.append('activity_status', activityStatus);
+    } else if (metric === 'invalid-dates') {
+        const activityType = document.getElementById('invalidDatesActivityTypeFilter')?.value;
+        const activityStatus = document.getElementById('invalidDatesActivityStatusFilter')?.value;
+        
+        if (activityType) params.append('activity_type', activityType);
+        if (activityStatus) params.append('activity_status', activityStatus);
+    } else if (metric === 'resources') {
+        const activityType = document.getElementById('resourcesActivityTypeFilter')?.value;
+        const activityStatus = document.getElementById('resourcesActivityStatusFilter')?.value;
+        
+        if (activityType) params.append('activity_type', activityType);
+        if (activityStatus) params.append('activity_status', activityStatus);
+    } else if (metric === 'fs') {
+        const relationshipType = document.getElementById('fsRelationshipTypeFilter')?.value;
+        const lag = document.getElementById('fsLagFilter')?.value;
+        const freeFloat = document.getElementById('fsFreeFloatFilter')?.value;
+        const driving = document.getElementById('fsDrivingFilter')?.value;
+        
+        if (relationshipType) params.append('relationship_type', relationshipType);
+        if (lag) params.append('lag', lag);
+        if (freeFloat) params.append('free_float', freeFloat);
+        if (driving) params.append('driving', driving);
+    } else if (metric === 'non-fs') {
+        const relationshipType = document.getElementById('nonFsRelationshipTypeFilter')?.value;
+        const lag = document.getElementById('nonFsLagFilter')?.value;
+        const freeFloat = document.getElementById('nonFsFreeFloatFilter')?.value;
+        const driving = document.getElementById('nonFsDrivingFilter')?.value;
+        
+        if (relationshipType) params.append('relationship_type', relationshipType);
+        if (lag) params.append('lag', lag);
+        if (freeFloat) params.append('free_float', freeFloat);
+        if (driving) params.append('driving', driving);
+    } else if (metric === 'leads') {
+        const relationshipType = document.getElementById('leadsRelationshipTypeFilter')?.value;
+        const lag = document.getElementById('leadsLagFilter')?.value;
+        const freeFloat = document.getElementById('leadsFreeFloatFilter')?.value;
+        const driving = document.getElementById('leadsDrivingFilter')?.value;
+        
+        if (relationshipType) params.append('relationship_type', relationshipType);
+        if (lag) params.append('lag', lag);
+        if (freeFloat) params.append('free_float', freeFloat);
+        if (driving) params.append('driving', driving);
+    } else if (metric === 'lags') {
+        const relationshipType = document.getElementById('lagsRelationshipTypeFilter')?.value;
+        const lag = document.getElementById('lagsLagFilter')?.value;
+        const freeFloat = document.getElementById('lagsFreeFloatFilter')?.value;
+        const driving = document.getElementById('lagsDrivingFilter')?.value;
+        
+        if (relationshipType) params.append('relationship_type', relationshipType);
+        if (lag) params.append('lag', lag);
+        if (freeFloat) params.append('free_float', freeFloat);
+        if (driving) params.append('driving', driving);
+    } else if (metric === 'excessive-lags') {
+        const relationshipType = document.getElementById('excessiveLagsRelationshipTypeFilter')?.value;
+        const lag = document.getElementById('excessiveLagsLagFilter')?.value;
+        const freeFloat = document.getElementById('excessiveLagsFreeFloatFilter')?.value;
+        const driving = document.getElementById('excessiveLagsDrivingFilter')?.value;
+        
+        if (relationshipType) params.append('relationship_type', relationshipType);
+        if (lag) params.append('lag', lag);
+        if (freeFloat) params.append('free_float', freeFloat);
+        if (driving) params.append('driving', driving);
+    }
+    
+    const url = `${API_BASE}${endpoint}?${params.toString()}`;
     
     const response = await fetch(url);
     if (!response.ok) throw new Error(`Failed to fetch KPI data: ${response.status}`);
@@ -258,9 +1143,120 @@ async function fetchKPIData(metric) {
 
 async function fetchChartData(metric) {
     const endpoint = getChartEndpoint(metric);
-    const url = currentProjectId ? 
-        `${API_BASE}${endpoint}?project_id=${currentProjectId}` : 
-        `${API_BASE}${endpoint}`;
+    const params = new URLSearchParams();
+    
+    if (currentProjectId) {
+        params.append('project_id', currentProjectId);
+    }
+    
+    // Add metric-specific filters
+    if (metric === 'open-ends') {
+        const activityType = document.getElementById('activityTypeFilter')?.value;
+        const activityStatus = document.getElementById('activityStatusFilter')?.value;
+        
+        if (activityType) params.append('activity_type', activityType);
+        if (activityStatus) params.append('activity_status', activityStatus);
+    } else if (metric === 'constraints') {
+        const activityType = document.getElementById('constraintsActivityTypeFilter')?.value;
+        const activityStatus = document.getElementById('constraintsActivityStatusFilter')?.value;
+        
+        if (activityType) params.append('activity_type', activityType);
+        if (activityStatus) params.append('activity_status', activityStatus);
+    } else if (metric === 'excessive-durations') {
+        const activityType = document.getElementById('excessiveDurationsActivityTypeFilter')?.value;
+        const activityStatus = document.getElementById('excessiveDurationsActivityStatusFilter')?.value;
+        
+        if (activityType) params.append('activity_type', activityType);
+        if (activityStatus) params.append('activity_status', activityStatus);
+    } else if (metric === 'negative-float') {
+        const activityType = document.getElementById('negativeFloatActivityTypeFilter')?.value;
+        const activityStatus = document.getElementById('negativeFloatActivityStatusFilter')?.value;
+        
+        if (activityType) params.append('activity_type', activityType);
+        if (activityStatus) params.append('activity_status', activityStatus);
+    } else if (metric === 'critical-float') {
+        const activityType = document.getElementById('criticalFloatActivityTypeFilter')?.value;
+        const activityStatus = document.getElementById('criticalFloatActivityStatusFilter')?.value;
+        
+        if (activityType) params.append('activity_type', activityType);
+        if (activityStatus) params.append('activity_status', activityStatus);
+    } else if (metric === 'excessive-float') {
+        const activityType = document.getElementById('excessiveFloatActivityTypeFilter')?.value;
+        const activityStatus = document.getElementById('excessiveFloatActivityStatusFilter')?.value;
+        
+        if (activityType) params.append('activity_type', activityType);
+        if (activityStatus) params.append('activity_status', activityStatus);
+    } else if (metric === 'riding-data-date') {
+        const activityType = document.getElementById('ridingDatesActivityTypeFilter')?.value;
+        const activityStatus = document.getElementById('ridingDatesActivityStatusFilter')?.value;
+        
+        if (activityType) params.append('activity_type', activityType);
+        if (activityStatus) params.append('activity_status', activityStatus);
+    } else if (metric === 'invalid-dates') {
+        const activityType = document.getElementById('invalidDatesActivityTypeFilter')?.value;
+        const activityStatus = document.getElementById('invalidDatesActivityStatusFilter')?.value;
+        
+        if (activityType) params.append('activity_type', activityType);
+        if (activityStatus) params.append('activity_status', activityStatus);
+    } else if (metric === 'resources') {
+        const activityType = document.getElementById('resourcesActivityTypeFilter')?.value;
+        const activityStatus = document.getElementById('resourcesActivityStatusFilter')?.value;
+        
+        if (activityType) params.append('activity_type', activityType);
+        if (activityStatus) params.append('activity_status', activityStatus);
+    } else if (metric === 'fs') {
+        const relationshipType = document.getElementById('fsRelationshipTypeFilter')?.value;
+        const lag = document.getElementById('fsLagFilter')?.value;
+        const freeFloat = document.getElementById('fsFreeFloatFilter')?.value;
+        const driving = document.getElementById('fsDrivingFilter')?.value;
+        
+        if (relationshipType) params.append('relationship_type', relationshipType);
+        if (lag) params.append('lag', lag);
+        if (freeFloat) params.append('free_float', freeFloat);
+        if (driving) params.append('driving', driving);
+    } else if (metric === 'non-fs') {
+        const relationshipType = document.getElementById('nonFsRelationshipTypeFilter')?.value;
+        const lag = document.getElementById('nonFsLagFilter')?.value;
+        const freeFloat = document.getElementById('nonFsFreeFloatFilter')?.value;
+        const driving = document.getElementById('nonFsDrivingFilter')?.value;
+        
+        if (relationshipType) params.append('relationship_type', relationshipType);
+        if (lag) params.append('lag', lag);
+        if (freeFloat) params.append('free_float', freeFloat);
+        if (driving) params.append('driving', driving);
+    } else if (metric === 'leads') {
+        const relationshipType = document.getElementById('leadsRelationshipTypeFilter')?.value;
+        const lag = document.getElementById('leadsLagFilter')?.value;
+        const freeFloat = document.getElementById('leadsFreeFloatFilter')?.value;
+        const driving = document.getElementById('leadsDrivingFilter')?.value;
+        
+        if (relationshipType) params.append('relationship_type', relationshipType);
+        if (lag) params.append('lag', lag);
+        if (freeFloat) params.append('free_float', freeFloat);
+        if (driving) params.append('driving', driving);
+    } else if (metric === 'lags') {
+        const relationshipType = document.getElementById('lagsRelationshipTypeFilter')?.value;
+        const lag = document.getElementById('lagsLagFilter')?.value;
+        const freeFloat = document.getElementById('lagsFreeFloatFilter')?.value;
+        const driving = document.getElementById('lagsDrivingFilter')?.value;
+        
+        if (relationshipType) params.append('relationship_type', relationshipType);
+        if (lag) params.append('lag', lag);
+        if (freeFloat) params.append('free_float', freeFloat);
+        if (driving) params.append('driving', driving);
+    } else if (metric === 'excessive-lags') {
+        const relationshipType = document.getElementById('excessiveLagsRelationshipTypeFilter')?.value;
+        const lag = document.getElementById('excessiveLagsLagFilter')?.value;
+        const freeFloat = document.getElementById('excessiveLagsFreeFloatFilter')?.value;
+        const driving = document.getElementById('excessiveLagsDrivingFilter')?.value;
+        
+        if (relationshipType) params.append('relationship_type', relationshipType);
+        if (lag) params.append('lag', lag);
+        if (freeFloat) params.append('free_float', freeFloat);
+        if (driving) params.append('driving', driving);
+    }
+    
+    const url = `${API_BASE}${endpoint}?${params.toString()}`;
     
     const response = await fetch(url);
     if (!response.ok) throw new Error(`Failed to fetch chart data: ${response.status}`);
@@ -269,9 +1265,120 @@ async function fetchChartData(metric) {
 
 async function fetchHistoryData(metric) {
     const endpoint = getHistoryEndpoint(metric);
-    const url = currentProjectId ? 
-        `${API_BASE}${endpoint}?project_id=${currentProjectId}` : 
-        `${API_BASE}${endpoint}`;
+    const params = new URLSearchParams();
+    
+    if (currentProjectId) {
+        params.append('project_id', currentProjectId);
+    }
+    
+    // Add metric-specific filters
+    if (metric === 'open-ends') {
+        const activityType = document.getElementById('activityTypeFilter')?.value;
+        const activityStatus = document.getElementById('activityStatusFilter')?.value;
+        
+        if (activityType) params.append('activity_type', activityType);
+        if (activityStatus) params.append('activity_status', activityStatus);
+    } else if (metric === 'constraints') {
+        const activityType = document.getElementById('constraintsActivityTypeFilter')?.value;
+        const activityStatus = document.getElementById('constraintsActivityStatusFilter')?.value;
+        
+        if (activityType) params.append('activity_type', activityType);
+        if (activityStatus) params.append('activity_status', activityStatus);
+    } else if (metric === 'excessive-durations') {
+        const activityType = document.getElementById('excessiveDurationsActivityTypeFilter')?.value;
+        const activityStatus = document.getElementById('excessiveDurationsActivityStatusFilter')?.value;
+        
+        if (activityType) params.append('activity_type', activityType);
+        if (activityStatus) params.append('activity_status', activityStatus);
+    } else if (metric === 'negative-float') {
+        const activityType = document.getElementById('negativeFloatActivityTypeFilter')?.value;
+        const activityStatus = document.getElementById('negativeFloatActivityStatusFilter')?.value;
+        
+        if (activityType) params.append('activity_type', activityType);
+        if (activityStatus) params.append('activity_status', activityStatus);
+    } else if (metric === 'critical-float') {
+        const activityType = document.getElementById('criticalFloatActivityTypeFilter')?.value;
+        const activityStatus = document.getElementById('criticalFloatActivityStatusFilter')?.value;
+        
+        if (activityType) params.append('activity_type', activityType);
+        if (activityStatus) params.append('activity_status', activityStatus);
+    } else if (metric === 'excessive-float') {
+        const activityType = document.getElementById('excessiveFloatActivityTypeFilter')?.value;
+        const activityStatus = document.getElementById('excessiveFloatActivityStatusFilter')?.value;
+        
+        if (activityType) params.append('activity_type', activityType);
+        if (activityStatus) params.append('activity_status', activityStatus);
+    } else if (metric === 'riding-data-date') {
+        const activityType = document.getElementById('ridingDatesActivityTypeFilter')?.value;
+        const activityStatus = document.getElementById('ridingDatesActivityStatusFilter')?.value;
+        
+        if (activityType) params.append('activity_type', activityType);
+        if (activityStatus) params.append('activity_status', activityStatus);
+    } else if (metric === 'invalid-dates') {
+        const activityType = document.getElementById('invalidDatesActivityTypeFilter')?.value;
+        const activityStatus = document.getElementById('invalidDatesActivityStatusFilter')?.value;
+        
+        if (activityType) params.append('activity_type', activityType);
+        if (activityStatus) params.append('activity_status', activityStatus);
+    } else if (metric === 'resources') {
+        const activityType = document.getElementById('resourcesActivityTypeFilter')?.value;
+        const activityStatus = document.getElementById('resourcesActivityStatusFilter')?.value;
+        
+        if (activityType) params.append('activity_type', activityType);
+        if (activityStatus) params.append('activity_status', activityStatus);
+    } else if (metric === 'fs') {
+        const relationshipType = document.getElementById('fsRelationshipTypeFilter')?.value;
+        const lag = document.getElementById('fsLagFilter')?.value;
+        const freeFloat = document.getElementById('fsFreeFloatFilter')?.value;
+        const driving = document.getElementById('fsDrivingFilter')?.value;
+        
+        if (relationshipType) params.append('relationship_type', relationshipType);
+        if (lag) params.append('lag', lag);
+        if (freeFloat) params.append('free_float', freeFloat);
+        if (driving) params.append('driving', driving);
+    } else if (metric === 'non-fs') {
+        const relationshipType = document.getElementById('nonFsRelationshipTypeFilter')?.value;
+        const lag = document.getElementById('nonFsLagFilter')?.value;
+        const freeFloat = document.getElementById('nonFsFreeFloatFilter')?.value;
+        const driving = document.getElementById('nonFsDrivingFilter')?.value;
+        
+        if (relationshipType) params.append('relationship_type', relationshipType);
+        if (lag) params.append('lag', lag);
+        if (freeFloat) params.append('free_float', freeFloat);
+        if (driving) params.append('driving', driving);
+    } else if (metric === 'leads') {
+        const relationshipType = document.getElementById('leadsRelationshipTypeFilter')?.value;
+        const lag = document.getElementById('leadsLagFilter')?.value;
+        const freeFloat = document.getElementById('leadsFreeFloatFilter')?.value;
+        const driving = document.getElementById('leadsDrivingFilter')?.value;
+        
+        if (relationshipType) params.append('relationship_type', relationshipType);
+        if (lag) params.append('lag', lag);
+        if (freeFloat) params.append('free_float', freeFloat);
+        if (driving) params.append('driving', driving);
+    } else if (metric === 'lags') {
+        const relationshipType = document.getElementById('lagsRelationshipTypeFilter')?.value;
+        const lag = document.getElementById('lagsLagFilter')?.value;
+        const freeFloat = document.getElementById('lagsFreeFloatFilter')?.value;
+        const driving = document.getElementById('lagsDrivingFilter')?.value;
+        
+        if (relationshipType) params.append('relationship_type', relationshipType);
+        if (lag) params.append('lag', lag);
+        if (freeFloat) params.append('free_float', freeFloat);
+        if (driving) params.append('driving', driving);
+    } else if (metric === 'excessive-lags') {
+        const relationshipType = document.getElementById('excessiveLagsRelationshipTypeFilter')?.value;
+        const lag = document.getElementById('excessiveLagsLagFilter')?.value;
+        const freeFloat = document.getElementById('excessiveLagsFreeFloatFilter')?.value;
+        const driving = document.getElementById('excessiveLagsDrivingFilter')?.value;
+        
+        if (relationshipType) params.append('relationship_type', relationshipType);
+        if (lag) params.append('lag', lag);
+        if (freeFloat) params.append('free_float', freeFloat);
+        if (driving) params.append('driving', driving);
+    }
+    
+    const url = `${API_BASE}${endpoint}?${params.toString()}`;
     
     const response = await fetch(url);
     if (!response.ok) throw new Error(`Failed to fetch history data: ${response.status}`);
@@ -280,9 +1387,122 @@ async function fetchHistoryData(metric) {
 
 async function fetchTableData(metric) {
     const endpoint = getTableEndpoint(metric);
-    const url = currentProjectId ? 
-        `${API_BASE}${endpoint}?project_id=${currentProjectId}&limit=20` : 
-        `${API_BASE}${endpoint}?limit=20`;
+    const params = new URLSearchParams();
+    
+    if (currentProjectId) {
+        params.append('project_id', currentProjectId);
+    }
+    
+    params.append('limit', '20');
+    
+    // Add metric-specific filters
+    if (metric === 'open-ends') {
+        const activityType = document.getElementById('activityTypeFilter')?.value;
+        const activityStatus = document.getElementById('activityStatusFilter')?.value;
+        
+        if (activityType) params.append('activity_type', activityType);
+        if (activityStatus) params.append('activity_status', activityStatus);
+    } else if (metric === 'constraints') {
+        const activityType = document.getElementById('constraintsActivityTypeFilter')?.value;
+        const activityStatus = document.getElementById('constraintsActivityStatusFilter')?.value;
+        
+        if (activityType) params.append('activity_type', activityType);
+        if (activityStatus) params.append('activity_status', activityStatus);
+    } else if (metric === 'excessive-durations') {
+        const activityType = document.getElementById('excessiveDurationsActivityTypeFilter')?.value;
+        const activityStatus = document.getElementById('excessiveDurationsActivityStatusFilter')?.value;
+        
+        if (activityType) params.append('activity_type', activityType);
+        if (activityStatus) params.append('activity_status', activityStatus);
+    } else if (metric === 'negative-float') {
+        const activityType = document.getElementById('negativeFloatActivityTypeFilter')?.value;
+        const activityStatus = document.getElementById('negativeFloatActivityStatusFilter')?.value;
+        
+        if (activityType) params.append('activity_type', activityType);
+        if (activityStatus) params.append('activity_status', activityStatus);
+    } else if (metric === 'critical-float') {
+        const activityType = document.getElementById('criticalFloatActivityTypeFilter')?.value;
+        const activityStatus = document.getElementById('criticalFloatActivityStatusFilter')?.value;
+        
+        if (activityType) params.append('activity_type', activityType);
+        if (activityStatus) params.append('activity_status', activityStatus);
+    } else if (metric === 'excessive-float') {
+        const activityType = document.getElementById('excessiveFloatActivityTypeFilter')?.value;
+        const activityStatus = document.getElementById('excessiveFloatActivityStatusFilter')?.value;
+        
+        if (activityType) params.append('activity_type', activityType);
+        if (activityStatus) params.append('activity_status', activityStatus);
+    } else if (metric === 'riding-data-date') {
+        const activityType = document.getElementById('ridingDatesActivityTypeFilter')?.value;
+        const activityStatus = document.getElementById('ridingDatesActivityStatusFilter')?.value;
+        
+        if (activityType) params.append('activity_type', activityType);
+        if (activityStatus) params.append('activity_status', activityStatus);
+    } else if (metric === 'invalid-dates') {
+        const activityType = document.getElementById('invalidDatesActivityTypeFilter')?.value;
+        const activityStatus = document.getElementById('invalidDatesActivityStatusFilter')?.value;
+        
+        if (activityType) params.append('activity_type', activityType);
+        if (activityStatus) params.append('activity_status', activityStatus);
+    } else if (metric === 'resources') {
+        const activityType = document.getElementById('resourcesActivityTypeFilter')?.value;
+        const activityStatus = document.getElementById('resourcesActivityStatusFilter')?.value;
+        
+        if (activityType) params.append('activity_type', activityType);
+        if (activityStatus) params.append('activity_status', activityStatus);
+    } else if (metric === 'fs') {
+        const relationshipType = document.getElementById('fsRelationshipTypeFilter')?.value;
+        const lag = document.getElementById('fsLagFilter')?.value;
+        const freeFloat = document.getElementById('fsFreeFloatFilter')?.value;
+        const driving = document.getElementById('fsDrivingFilter')?.value;
+        
+        if (relationshipType) params.append('relationship_type', relationshipType);
+        if (lag) params.append('lag', lag);
+        if (freeFloat) params.append('free_float', freeFloat);
+        if (driving) params.append('driving', driving);
+    } else if (metric === 'non-fs') {
+        const relationshipType = document.getElementById('nonFsRelationshipTypeFilter')?.value;
+        const lag = document.getElementById('nonFsLagFilter')?.value;
+        const freeFloat = document.getElementById('nonFsFreeFloatFilter')?.value;
+        const driving = document.getElementById('nonFsDrivingFilter')?.value;
+        
+        if (relationshipType) params.append('relationship_type', relationshipType);
+        if (lag) params.append('lag', lag);
+        if (freeFloat) params.append('free_float', freeFloat);
+        if (driving) params.append('driving', driving);
+    } else if (metric === 'leads') {
+        const relationshipType = document.getElementById('leadsRelationshipTypeFilter')?.value;
+        const lag = document.getElementById('leadsLagFilter')?.value;
+        const freeFloat = document.getElementById('leadsFreeFloatFilter')?.value;
+        const driving = document.getElementById('leadsDrivingFilter')?.value;
+        
+        if (relationshipType) params.append('relationship_type', relationshipType);
+        if (lag) params.append('lag', lag);
+        if (freeFloat) params.append('free_float', freeFloat);
+        if (driving) params.append('driving', driving);
+    } else if (metric === 'lags') {
+        const relationshipType = document.getElementById('lagsRelationshipTypeFilter')?.value;
+        const lag = document.getElementById('lagsLagFilter')?.value;
+        const freeFloat = document.getElementById('lagsFreeFloatFilter')?.value;
+        const driving = document.getElementById('lagsDrivingFilter')?.value;
+        
+        if (relationshipType) params.append('relationship_type', relationshipType);
+        if (lag) params.append('lag', lag);
+        if (freeFloat) params.append('free_float', freeFloat);
+        if (driving) params.append('driving', driving);
+    } else if (metric === 'excessive-lags') {
+        const relationshipType = document.getElementById('excessiveLagsRelationshipTypeFilter')?.value;
+        const lag = document.getElementById('excessiveLagsLagFilter')?.value;
+        const freeFloat = document.getElementById('excessiveLagsFreeFloatFilter')?.value;
+        const driving = document.getElementById('excessiveLagsDrivingFilter')?.value;
+        
+        if (relationshipType) params.append('relationship_type', relationshipType);
+        if (lag) params.append('lag', lag);
+        if (freeFloat) params.append('free_float', freeFloat);
+        if (driving) params.append('driving', driving);
+    }
+    
+    const url = `${API_BASE}${endpoint}?${params.toString()}`;
     
     const response = await fetch(url);
     if (!response.ok) throw new Error(`Failed to fetch table data: ${response.status}`);

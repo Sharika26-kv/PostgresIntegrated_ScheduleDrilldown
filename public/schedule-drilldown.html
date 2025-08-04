@@ -142,6 +142,241 @@
                                 <i class="fas fa-sync-alt mr-1"></i> Load
                             </button>
                         </div>
+                        
+                        <!-- Metric-specific filters (initially hidden) -->
+                        <div id="metricFilters" class="flex items-center space-x-4" style="display: none;">
+                            <!-- Open Ends filters -->
+                            <div id="open-ends-filters" class="flex items-center space-x-2" style="display: none;">
+                                <label for="activityTypeFilter" class="text-sm font-medium text-gray-700">Activity Type:</label>
+                                <select id="activityTypeFilter" class="px-2 py-1 border border-gray-300 rounded text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Types</option>
+                                </select>
+                                
+                                <label for="activityStatusFilter" class="text-sm font-medium text-gray-700 ml-2">Activity Status:</label>
+                                <select id="activityStatusFilter" class="px-2 py-1 border border-gray-300 rounded text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Statuses</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Constraints filters -->
+                            <div id="constraints-filters" class="flex items-center space-x-2" style="display: none;">
+                                <label for="constraintsActivityTypeFilter" class="text-sm font-medium text-gray-700">Activity Type:</label>
+                                <select id="constraintsActivityTypeFilter" class="px-2 py-1 border border-gray-300 rounded text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Types</option>
+                                </select>
+                                
+                                <label for="constraintsActivityStatusFilter" class="text-sm font-medium text-gray-700 ml-2">Activity Status:</label>
+                                <select id="constraintsActivityStatusFilter" class="px-2 py-1 border border-gray-300 rounded text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Statuses</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Excessive Durations filters -->
+                            <div id="excessive-durations-filters" class="flex items-center space-x-2" style="display: none;">
+                                <label for="excessiveDurationsActivityTypeFilter" class="text-sm font-medium text-gray-700">Activity Type:</label>
+                                <select id="excessiveDurationsActivityTypeFilter" class="px-2 py-1 border border-gray-300 rounded text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Types</option>
+                                </select>
+                                
+                                <label for="excessiveDurationsActivityStatusFilter" class="text-sm font-medium text-gray-700 ml-2">Activity Status:</label>
+                                <select id="excessiveDurationsActivityStatusFilter" class="px-2 py-1 border border-gray-300 rounded text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Statuses</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Negative Total Float filters -->
+                            <div id="negative-float-filters" class="flex items-center space-x-2" style="display: none;">
+                                <label for="negativeFloatActivityTypeFilter" class="text-sm font-medium text-gray-700">Activity Type:</label>
+                                <select id="negativeFloatActivityTypeFilter" class="px-2 py-1 border border-gray-300 rounded text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Types</option>
+                                </select>
+                                
+                                <label for="negativeFloatActivityStatusFilter" class="text-sm font-medium text-gray-700 ml-2">Activity Status:</label>
+                                <select id="negativeFloatActivityStatusFilter" class="px-2 py-1 border border-gray-300 rounded text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Statuses</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Critical Total Float filters -->
+                            <div id="critical-float-filters" class="flex items-center space-x-2" style="display: none;">
+                                <label for="criticalFloatActivityTypeFilter" class="text-sm font-medium text-gray-700">Activity Type:</label>
+                                <select id="criticalFloatActivityTypeFilter" class="px-2 py-1 border border-gray-300 rounded text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Types</option>
+                                </select>
+                                
+                                <label for="criticalFloatActivityStatusFilter" class="text-sm font-medium text-gray-700 ml-2">Activity Status:</label>
+                                <select id="criticalFloatActivityStatusFilter" class="px-2 py-1 border border-gray-300 rounded text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Statuses</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Excessive Total Float filters -->
+                            <div id="excessive-float-filters" class="flex items-center space-x-2" style="display: none;">
+                                <label for="excessiveFloatActivityTypeFilter" class="text-sm font-medium text-gray-700">Activity Type:</label>
+                                <select id="excessiveFloatActivityTypeFilter" class="px-2 py-1 border border-gray-300 rounded text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Types</option>
+                                </select>
+                                
+                                <label for="excessiveFloatActivityStatusFilter" class="text-sm font-medium text-gray-700 ml-2">Activity Status:</label>
+                                <select id="excessiveFloatActivityStatusFilter" class="px-2 py-1 border border-gray-300 rounded text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Statuses</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Riding Data Dates filters -->
+                            <div id="riding-dates-filters" class="flex items-center space-x-2" style="display: none;">
+                                <label for="ridingDatesActivityTypeFilter" class="text-sm font-medium text-gray-700">Activity Type:</label>
+                                <select id="ridingDatesActivityTypeFilter" class="px-2 py-1 border border-gray-300 rounded text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Types</option>
+                                </select>
+                                
+                                <label for="ridingDatesActivityStatusFilter" class="text-sm font-medium text-gray-700 ml-2">Activity Status:</label>
+                                <select id="ridingDatesActivityStatusFilter" class="px-2 py-1 border border-gray-300 rounded text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Statuses</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Invalid Dates filters -->
+                            <div id="invalid-dates-filters" class="flex items-center space-x-2" style="display: none;">
+                                <label for="invalidDatesActivityTypeFilter" class="text-sm font-medium text-gray-700">Activity Type:</label>
+                                <select id="invalidDatesActivityTypeFilter" class="px-2 py-1 border border-gray-300 rounded text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Types</option>
+                                </select>
+                                
+                                <label for="invalidDatesActivityStatusFilter" class="text-sm font-medium text-gray-700 ml-2">Activity Status:</label>
+                                <select id="invalidDatesActivityStatusFilter" class="px-2 py-1 border border-gray-300 rounded text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Statuses</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Resources filters -->
+                            <div id="resources-filters" class="flex items-center space-x-2" style="display: none;">
+                                <label for="resourcesActivityTypeFilter" class="text-sm font-medium text-gray-700">Activity Type:</label>
+                                <select id="resourcesActivityTypeFilter" class="px-2 py-1 border border-gray-300 rounded text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Types</option>
+                                </select>
+                                
+                                <label for="resourcesActivityStatusFilter" class="text-sm font-medium text-gray-700 ml-2">Activity Status:</label>
+                                <select id="resourcesActivityStatusFilter" class="px-2 py-1 border border-gray-300 rounded text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Statuses</option>
+                                </select>
+                            </div>
+                            
+                            <!-- FS+0d Lag filters -->
+                            <div id="fs-filters" class="flex items-center space-x-2" style="display: none;">
+                                <label for="fsRelationshipTypeFilter" class="text-sm font-medium text-gray-700">Relationship Type:</label>
+                                <select id="fsRelationshipTypeFilter" class="px-2 py-1 border border-gray-300 rounded text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Types</option>
+                                </select>
+                                
+                                <label for="fsLagFilter" class="text-sm font-medium text-gray-700 ml-2">Lag:</label>
+                                <select id="fsLagFilter" class="px-2 py-1 border border-gray-300 rounded text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Lags</option>
+                                </select>
+                                
+                                <label for="fsFreeFloatFilter" class="text-sm font-medium text-gray-700 ml-2">Free Float:</label>
+                                <select id="fsFreeFloatFilter" class="px-2 py-1 border border-gray-300 rounded text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Free Floats</option>
+                                </select>
+                                
+                                <label for="fsDrivingFilter" class="text-sm font-medium text-gray-700 ml-2">Driving:</label>
+                                <select id="fsDrivingFilter" class="px-2 py-1 border border-gray-300 rounded text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Driving</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Non-FS+0d Lag filters -->
+                            <div id="non-fs-filters" class="flex items-center space-x-2" style="display: none;">
+                                <label for="nonFsRelationshipTypeFilter" class="text-sm font-medium text-gray-700">Relationship Type:</label>
+                                <select id="nonFsRelationshipTypeFilter" class="px-2 py-1 border border-gray-300 rounded text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Types</option>
+                                </select>
+                                
+                                <label for="nonFsLagFilter" class="text-sm font-medium text-gray-700 ml-2">Lag:</label>
+                                <select id="nonFsLagFilter" class="px-2 py-1 border border-gray-300 rounded text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Lags</option>
+                                </select>
+                                
+                                <label for="nonFsFreeFloatFilter" class="text-sm font-medium text-gray-700 ml-2">Free Float:</label>
+                                <select id="nonFsFreeFloatFilter" class="px-2 py-1 border border-gray-300 rounded text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Free Floats</option>
+                                </select>
+                                
+                                <label for="nonFsDrivingFilter" class="text-sm font-medium text-gray-700 ml-2">Driving:</label>
+                                <select id="nonFsDrivingFilter" class="px-2 py-1 border border-gray-300 rounded text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Driving</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Leads filters -->
+                            <div id="leads-filters" class="flex items-center space-x-2" style="display: none;">
+                                <label for="leadsRelationshipTypeFilter" class="text-sm font-medium text-gray-700">Relationship Type:</label>
+                                <select id="leadsRelationshipTypeFilter" class="px-2 py-1 border border-gray-300 rounded text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Types</option>
+                                </select>
+                                
+                                <label for="leadsLagFilter" class="text-sm font-medium text-gray-700 ml-2">Lag:</label>
+                                <select id="leadsLagFilter" class="px-2 py-1 border border-gray-300 rounded text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Lags</option>
+                                </select>
+                                
+                                <label for="leadsFreeFloatFilter" class="text-sm font-medium text-gray-700 ml-2">Free Float:</label>
+                                <select id="leadsFreeFloatFilter" class="px-2 py-1 border border-gray-300 rounded text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Free Floats</option>
+                                </select>
+                                
+                                <label for="leadsDrivingFilter" class="text-sm font-medium text-gray-700 ml-2">Driving:</label>
+                                <select id="leadsDrivingFilter" class="px-2 py-1 border border-gray-300 rounded text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Driving</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Lags filters -->
+                            <div id="lags-filters" class="flex items-center space-x-2" style="display: none;">
+                                <label for="lagsRelationshipTypeFilter" class="text-sm font-medium text-gray-700">Relationship Type:</label>
+                                <select id="lagsRelationshipTypeFilter" class="px-2 py-1 border border-gray-300 rounded text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Types</option>
+                                </select>
+                                
+                                <label for="lagsLagFilter" class="text-sm font-medium text-gray-700 ml-2">Lag:</label>
+                                <select id="lagsLagFilter" class="px-2 py-1 border border-gray-300 rounded text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Lags</option>
+                                </select>
+                                
+                                <label for="lagsFreeFloatFilter" class="text-sm font-medium text-gray-700 ml-2">Free Float:</label>
+                                <select id="lagsFreeFloatFilter" class="px-2 py-1 border border-gray-300 rounded text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Free Floats</option>
+                                </select>
+                                
+                                <label for="lagsDrivingFilter" class="text-sm font-medium text-gray-700 ml-2">Driving:</label>
+                                <select id="lagsDrivingFilter" class="px-2 py-1 border border-gray-300 rounded text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Driving</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Excessive Lags filters -->
+                            <div id="excessive-lags-filters" class="flex items-center space-x-2" style="display: none;">
+                                <label for="excessiveLagsRelationshipTypeFilter" class="text-sm font-medium text-gray-700">Relationship Type:</label>
+                                <select id="excessiveLagsRelationshipTypeFilter" class="px-2 py-1 border border-gray-300 rounded text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Types</option>
+                                </select>
+                                
+                                <label for="excessiveLagsLagFilter" class="text-sm font-medium text-gray-700 ml-2">Lag:</label>
+                                <select id="excessiveLagsLagFilter" class="px-2 py-1 border border-gray-300 rounded text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Lags</option>
+                                </select>
+                                
+                                <label for="excessiveLagsFreeFloatFilter" class="text-sm font-medium text-gray-700 ml-2">Free Float:</label>
+                                <select id="excessiveLagsFreeFloatFilter" class="px-2 py-1 border border-gray-300 rounded text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Free Floats</option>
+                                </select>
+                                
+                                <label for="excessiveLagsDrivingFilter" class="text-sm font-medium text-gray-700 ml-2">Driving:</label>
+                                <select id="excessiveLagsDrivingFilter" class="px-2 py-1 border border-gray-300 rounded text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Driving</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </header>
