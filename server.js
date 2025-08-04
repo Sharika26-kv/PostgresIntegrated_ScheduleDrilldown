@@ -1435,6 +1435,7 @@ app.get('/api/schedule/leads-percentage-history', async (req, res) => {
         let query = `
             SELECT
                 TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM') as date,
+                p.proj_id as project_id,
                 COUNT(CASE WHEN CAST(a.lag AS REAL) < 0 THEN 1 END) * 100.0 / 
                 NULLIF(COUNT(*), 0) as percentage
             FROM activity_relationship_view a
@@ -1448,7 +1449,7 @@ app.get('/api/schedule/leads-percentage-history', async (req, res) => {
             params.push(projectId);
         }
         
-        query += ` GROUP BY TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM') ORDER BY date`;
+        query += ` GROUP BY TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM'), p.proj_id ORDER BY date, project_id`;
 
         const result = await db.query(query, params);
 
@@ -1592,6 +1593,7 @@ app.get('/api/schedule/lags-percentage-history', async (req, res) => {
         let query = `
             SELECT
                 TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM') as date,
+                p.proj_id as project_id,
                 COUNT(CASE WHEN CAST(a.lag AS REAL) > 0 THEN 1 END) * 100.0 / 
                 NULLIF(COUNT(*), 0) as percentage
             FROM activity_relationship_view a
@@ -1605,7 +1607,7 @@ app.get('/api/schedule/lags-percentage-history', async (req, res) => {
             params.push(projectId);
         }
         
-        query += ` GROUP BY TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM') ORDER BY date`;
+        query += ` GROUP BY TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM'), p.proj_id ORDER BY date, project_id`;
 
         const result = await db.query(query, params);
 
@@ -2380,6 +2382,7 @@ app.get('/api/schedule/excessive-lags-percentage-history', async (req, res) => {
         let query = `
             SELECT
                 TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM') as date,
+                p.proj_id as project_id,
                 COUNT(CASE WHEN a.lag > '0' THEN 1 END) * 100.0 / 
                 NULLIF(COUNT(*), 0) as percentage
             FROM activity_relationship_view a
@@ -2393,7 +2396,7 @@ app.get('/api/schedule/excessive-lags-percentage-history', async (req, res) => {
             params.push(projectId);
         }
         
-        query += ` GROUP BY TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM') ORDER BY date`;
+        query += ` GROUP BY TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM'), p.proj_id ORDER BY date, project_id`;
 
         const result = await db.query(query, params);
 
@@ -2417,6 +2420,7 @@ app.get('/api/schedule/fs-percentage-history', async (req, res) => {
         let query = `
             SELECT
                 TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM') as date,
+                p.proj_id as project_id,
                 COUNT(CASE WHEN a.relationship_type = 'PR_FS' AND a.lag = '0' THEN 1 END) * 100.0 / 
                 NULLIF(COUNT(*), 0) as percentage
             FROM activity_relationship_view a
@@ -2430,7 +2434,7 @@ app.get('/api/schedule/fs-percentage-history', async (req, res) => {
             params.push(projectId);
         }
         
-        query += ` GROUP BY TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM') ORDER BY date`;
+        query += ` GROUP BY TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM'), p.proj_id ORDER BY date, project_id`;
 
         const result = await db.query(query, params);
 
@@ -2454,6 +2458,7 @@ app.get('/api/schedule/non-fs-percentage-history', async (req, res) => {
         let query = `
             SELECT
                 TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM') as date,
+                p.proj_id as project_id,
                 COUNT(CASE WHEN a.relationship_type NOT IN ('PR_FS', 'PR_FS1') AND CAST(a.lag AS INTEGER) != 0 THEN 1 END) * 100.0 / 
                 NULLIF(COUNT(CASE WHEN a.relationship_status = 'Incomplete' THEN 1 END), 0) as percentage
             FROM activity_relationship_view a
@@ -2466,7 +2471,7 @@ app.get('/api/schedule/non-fs-percentage-history', async (req, res) => {
             params.push(projectId);
         }
         
-        query += ` GROUP BY TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM') ORDER BY date`;
+        query += ` GROUP BY TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM'), p.proj_id ORDER BY date, project_id`;
 
         const result = await db.query(query, params);
 
@@ -2657,6 +2662,7 @@ app.get('/api/schedule/open-ends-percentage-history', async (req, res) => {
         let query = `
             SELECT
                 TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM') as date,
+                p.proj_id as project_id,
                 COUNT(CASE WHEN a.openends = 'Open End' THEN 1 END) * 100.0 / 
                 NULLIF(COUNT(CASE WHEN a.activitystatus != 'Complete' THEN 1 END), 0) as percentage
             FROM activityanalysisview a
@@ -2670,7 +2676,7 @@ app.get('/api/schedule/open-ends-percentage-history', async (req, res) => {
             params.push(projectId);
         }
         
-        query += ` GROUP BY TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM') ORDER BY date`;
+        query += ` GROUP BY TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM'), p.proj_id ORDER BY date, project_id`;
 
         const result = await db.query(query, params);
 
@@ -2875,6 +2881,7 @@ app.get('/api/schedule/constraints-percentage-history', async (req, res) => {
         let query = `
             SELECT
                 TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM') as date,
+                p.proj_id as project_id,
                 COUNT(CASE WHEN a.primaryconstraint IN ('CS_MSO','CS_MSOB','CS_MSOA','CS_MEO','CS_MEOB','CS_MEOA','CS_ALAP') AND a.activitystatus != 'Complete' THEN 1 END) * 100.0 / 
                 NULLIF(COUNT(CASE WHEN a.activitystatus != 'Complete' THEN 1 END), 0) as percentage
             FROM activityanalysisview a
@@ -2888,7 +2895,7 @@ app.get('/api/schedule/constraints-percentage-history', async (req, res) => {
             params.push(projectId);
         }
         
-        query += ` GROUP BY TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM') ORDER BY date`;
+        query += ` GROUP BY TO_CHAR(p.last_recalc_date::DATE, 'YYYY-MM'), p.proj_id ORDER BY date, project_id`;
 
         const result = await db.query(query, params);
 
