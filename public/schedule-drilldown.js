@@ -2631,7 +2631,15 @@ function createHistoryChart(ctx, data, metric) {
                             size: 8
                         },
                         callback: function(value) {
-                            return value + '%';
+                            // Format percentage to 1 decimal place for the 5 specific metrics
+                            const targetMetrics = ['excessive-durations', 'negative-float', 'critical-float', 'excessive-float', 'riding-data-date'];
+                            const isTargetMetric = targetMetrics.includes(metric);
+                            
+                            if (isTargetMetric) {
+                                return value.toFixed(1) + '%';
+                            } else {
+                                return value + '%';
+                            }
                         }
                     }
                 },
@@ -2656,7 +2664,15 @@ function createHistoryChart(ctx, data, metric) {
                 tooltip: {
                     callbacks: {
                         label: function(context) {
-                            return `${context.dataset.label}: ${context.parsed.y}%`;
+                            // Format percentage to 1 decimal place for the 5 specific metrics
+                            const targetMetrics = ['excessive-durations', 'negative-float', 'critical-float', 'excessive-float', 'riding-data-date'];
+                            const isTargetMetric = targetMetrics.includes(metric);
+                            
+                            if (isTargetMetric) {
+                                return `${context.dataset.label}: ${context.parsed.y.toFixed(1)}%`;
+                            } else {
+                                return `${context.dataset.label}: ${context.parsed.y}%`;
+                            }
                         }
                     }
                 }
