@@ -8,6 +8,13 @@ let currentProjectId = null;
 // API Base URL - Updated to use current server port
 const API_BASE = window.location.origin;
 
+// Pagination state
+let currentPage = 1;
+let totalPages = 1;
+let totalRecords = 0;
+let pageSize = 50; // Records per page
+let allTableData = []; // Store all data for pagination
+
 // Initialize the application
 document.addEventListener('DOMContentLoaded', function() {
     initializeApp();
@@ -23,6 +30,7 @@ async function initializeApp() {
         
         // Set up event listeners
         setupEventListeners();
+        setupPaginationEventListeners();
         
         console.log('Schedule Drilldown initialized successfully');
     } catch (error) {
@@ -214,6 +222,12 @@ function selectMetric(metric) {
     // Show content area and hide initial message
     document.getElementById('metric-content').classList.remove('hidden');
     document.getElementById('initial-message').classList.add('hidden');
+    
+    // Make sure pagination controls are visible for debugging
+    const paginationControls = document.getElementById('pagination-controls');
+    if (paginationControls) {
+        paginationControls.style.display = 'flex';
+    }
     
     // Handle metric-specific filters
     setupMetricFilters(metric);
@@ -997,6 +1011,12 @@ async function loadMetricData(metric) {
     try {
         showLoading();
         
+        // Reset pagination for new metric
+        currentPage = 1;
+        totalPages = 1;
+        totalRecords = 0;
+        allTableData = [];
+        
         // Load all metric data in parallel
         const [kpiData, chartData, historyData, tableData] = await Promise.all([
             fetchKPIData(metric),
@@ -1009,7 +1029,7 @@ async function loadMetricData(metric) {
         updateKPISection(kpiData, metric);
         updateChartSection(chartData, metric);
         updateHistorySection(historyData, metric);
-        updateTableSection(tableData, metric);
+        // Table data is now handled by fetchTableData with pagination
         
         hideLoading();
     } catch (error) {
@@ -1393,7 +1413,8 @@ async function fetchTableData(metric) {
         params.append('project_id', currentProjectId);
     }
     
-    params.append('limit', '20');
+    // Remove limit to get all data for pagination
+    // params.append('limit', '20');
     
     // Add metric-specific filters
     if (metric === 'open-ends') {
@@ -1506,7 +1527,27 @@ async function fetchTableData(metric) {
     
     const response = await fetch(url);
     if (!response.ok) throw new Error(`Failed to fetch table data: ${response.status}`);
-    return response.json();
+    const data = await response.json();
+    
+    // Store all data and reset pagination
+    allTableData = data;
+    totalRecords = data.length;
+    totalPages = Math.ceil(totalRecords / pageSize);
+    currentPage = 1;
+    
+    console.log('Table data loaded:', totalRecords, 'records,', totalPages, 'pages');
+    
+    // Get current page data
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    const currentPageData = data.slice(startIndex, endIndex);
+    
+    console.log('Current page data:', currentPageData.length, 'records');
+    
+    updateTableSection(currentPageData, metric);
+    updatePaginationControls();
+    
+    return data;
 }
 
 function getKPIEndpoint(metric) {
@@ -2713,8 +2754,8 @@ function updateTableSection(data, metric) {
     });
     tableHead.appendChild(headerRow);
     
-    // Create table rows
-    data.slice(0, 50).forEach(row => { // Limit to 50 rows for performance
+    // Create table rows for current page data
+    data.forEach(row => {
         const tr = document.createElement('tr');
         tr.className = 'hover:bg-gray-50';
         
@@ -2735,13 +2776,102 @@ function updateTableSection(data, metric) {
         
         tableBody.appendChild(tr);
     });
+}
+
+// Pagination functions
+function updatePaginationControls() {
+    console.log('updatePaginationControls called - currentPage:', currentPage, 'totalPages:', totalPages, 'totalRecords:', totalRecords);
     
-    // Show total count if more than 50 rows
-    if (data.length > 50) {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td colspan="${tableConfig.columns.length}" class="px-2 py-1 text-xs text-gray-500 text-center">Showing 50 of ${data.length} records</td>`;
-        tableBody.appendChild(tr);
+    const paginationInfo = document.getElementById('pagination-info');
+    const currentPageInput = document.getElementById('current-page-input');
+    const totalPagesSpan = document.getElementById('total-pages');
+    const prevButton = document.getElementById('prev-page');
+    const nextButton = document.getElementById('next-page');
+    const pageSizeSelect = document.getElementById('page-size-select');
+    
+    if (!paginationInfo || !currentPageInput || !totalPagesSpan || !prevButton || !nextButton || !pageSizeSelect) {
+        console.error('Pagination controls not found in DOM');
+        return;
     }
+    
+    // Update pagination info
+    const startRecord = (currentPage - 1) * pageSize + 1;
+    const endRecord = Math.min(currentPage * pageSize, totalRecords);
+    paginationInfo.textContent = `Showing ${startRecord} to ${endRecord} of ${totalRecords} records`;
+    
+    // Update page input and total pages
+    currentPageInput.value = currentPage;
+    totalPagesSpan.textContent = totalPages;
+    
+    // Update button states
+    prevButton.disabled = currentPage <= 1;
+    nextButton.disabled = currentPage >= totalPages;
+    
+    // Update page size select
+    pageSizeSelect.value = pageSize;
+    
+    console.log('Pagination controls updated successfully');
+}
+
+function goToPage(page) {
+    console.log('goToPage called with page:', page, 'totalPages:', totalPages, 'currentMetric:', currentMetric);
+    
+    if (page < 1 || page > totalPages) {
+        console.log('Invalid page number:', page);
+        return;
+    }
+    
+    currentPage = page;
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    const currentPageData = allTableData.slice(startIndex, endIndex);
+    
+    console.log('Updating table with page data:', currentPageData.length, 'records');
+    updateTableSection(currentPageData, currentMetric);
+    updatePaginationControls();
+}
+
+function changePageSize(newPageSize) {
+    pageSize = parseInt(newPageSize);
+    totalPages = Math.ceil(totalRecords / pageSize);
+    currentPage = 1;
+    
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    const currentPageData = allTableData.slice(startIndex, endIndex);
+    
+    updateTableSection(currentPageData, currentMetric);
+    updatePaginationControls();
+}
+
+function setupPaginationEventListeners() {
+    // Use event delegation for better reliability
+    document.addEventListener('click', (e) => {
+        if (e.target.id === 'prev-page') {
+            console.log('Previous button clicked, current page:', currentPage);
+            e.preventDefault();
+            goToPage(currentPage - 1);
+        } else if (e.target.id === 'next-page') {
+            console.log('Next button clicked, current page:', currentPage);
+            e.preventDefault();
+            goToPage(currentPage + 1);
+        }
+    });
+    
+    document.addEventListener('change', (e) => {
+        if (e.target.id === 'current-page-input') {
+            const page = parseInt(e.target.value);
+            if (page >= 1 && page <= totalPages) {
+                goToPage(page);
+            } else {
+                e.target.value = currentPage; // Reset to current page if invalid
+            }
+        } else if (e.target.id === 'page-size-select') {
+            changePageSize(e.target.value);
+        }
+    });
+    
+    console.log('Pagination event listeners set up using event delegation');
 }
 
 function getTableConfig(metric) {

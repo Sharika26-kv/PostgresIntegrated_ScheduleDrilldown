@@ -140,8 +140,9 @@ async function getResourcesPercentageHistory(req, res) {
 // Get resources table data
 async function getResourcesTableData(req, res) {
     const projectId = req.query.project_id;
-    const limit = parseInt(req.query.limit) || 20;
-    console.log(`📋 Fetching resources table data for project: ${projectId}, limit: ${limit}`);
+    // Remove limit for pagination - let frontend handle pagination
+    // const limit = parseInt(req.query.limit) || 20;
+    console.log(`📋 Fetching resources table data for project: ${projectId}`);
     
     const query = `
         SELECT 
@@ -171,11 +172,10 @@ async function getResourcesTableData(req, res) {
             t.task_type,
             t.status_code
         ORDER BY t.task_id
-        LIMIT $${projectId ? '2' : '1'}
     `;
     
     try {
-        const result = await db.query(query, projectId ? [projectId, limit] : [limit]);
+        const result = await db.query(query, projectId ? [projectId] : []);
         res.json(result.rows);
     } catch (err) {
         console.error('❌ Error fetching resources table data:', err);

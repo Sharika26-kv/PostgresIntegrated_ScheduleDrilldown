@@ -613,6 +613,36 @@
                                 </tbody>
                             </table>
                         </div>
+                        
+                        <!-- Pagination Controls -->
+                        <div id="pagination-controls" class="flex items-center justify-between px-4 py-3 bg-gray-50 border-t border-gray-200">
+                            <div class="flex items-center text-xs text-gray-700">
+                                <span id="pagination-info">Showing 0 of 0 records</span>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <button id="prev-page" class="px-3 py-1 text-xs bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                                    <i class="fas fa-chevron-left mr-1"></i>Previous
+                                </button>
+                                <div class="flex items-center space-x-1">
+                                    <span class="text-xs text-gray-700">Page</span>
+                                    <input type="number" id="current-page-input" class="w-12 px-2 py-1 text-xs border border-gray-300 rounded-md text-center" min="1" value="1">
+                                    <span class="text-xs text-gray-700">of</span>
+                                    <span id="total-pages" class="text-xs text-gray-700">1</span>
+                                </div>
+                                <button id="next-page" class="px-3 py-1 text-xs bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                                    Next<i class="fas fa-chevron-right ml-1"></i>
+                                </button>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <span class="text-xs text-gray-700">Records per page:</span>
+                                <select id="page-size-select" class="px-2 py-1 text-xs border border-gray-300 rounded-md">
+                                    <option value="25">25</option>
+                                    <option value="50" selected>50</option>
+                                    <option value="100">100</option>
+                                    <option value="200">200</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 

@@ -1639,7 +1639,8 @@ app.get('/api/schedule/leads', async (req, res) => {
         const lag = req.query.lag;
         const freeFloat = req.query.free_float;
         const driving = req.query.driving;
-        const limit = req.query.limit || 20;
+        // Remove limit for pagination - let frontend handle pagination
+        // const limit = req.query.limit || 20;
         
         // Query for leads table data with correct filters
         let query = `
@@ -1697,8 +1698,9 @@ app.get('/api/schedule/leads', async (req, res) => {
             paramIndex++;
         }
         
-        query += ` ORDER BY CAST(lag AS REAL) ASC LIMIT $${paramIndex}`;
-        params.push(parseInt(limit));
+        query += ` ORDER BY CAST(lag AS REAL) ASC`;
+        // Remove limit for pagination
+        // params.push(parseInt(limit));
         
         console.log('[Leads Table] Query:', query);
         console.log('[Leads Table] Params:', params);
@@ -1998,7 +2000,8 @@ app.get('/api/schedule/lags', async (req, res) => {
         const lag = req.query.lag;
         const freeFloat = req.query.free_float;
         const driving = req.query.driving;
-        const limit = req.query.limit || 20;
+        // Remove limit for pagination - let frontend handle pagination
+        // const limit = req.query.limit || 20;
         
         // Query for lags table data with correct filters
         let query = `
@@ -2056,8 +2059,9 @@ app.get('/api/schedule/lags', async (req, res) => {
             paramIndex++;
         }
         
-        query += ` ORDER BY CAST(lag AS REAL) DESC LIMIT $${paramIndex}`;
-        params.push(parseInt(limit));
+        query += ` ORDER BY CAST(lag AS REAL) DESC`;
+        // Remove limit for pagination
+        // params.push(parseInt(limit));
         
         console.log('[Lags Table] Query:', query);
         console.log('[Lags Table] Params:', params);
@@ -2331,7 +2335,8 @@ app.get('/api/schedule/excessive-lags', async (req, res) => {
         const lag = req.query.lag;
         const freeFloat = req.query.free_float;
         const driving = req.query.driving;
-        const limit = req.query.limit || 20;
+        // Remove limit for pagination - let frontend handle pagination
+        // const limit = req.query.limit || 20;
         
         // Query for excessive lags table data with correct filters
         let query = `
@@ -2390,8 +2395,9 @@ app.get('/api/schedule/excessive-lags', async (req, res) => {
             paramIndex++;
         }
         
-        query += ` ORDER BY CAST(lag AS REAL) DESC LIMIT $${paramIndex}`;
-        params.push(parseInt(limit));
+        query += ` ORDER BY CAST(lag AS REAL) DESC`;
+        // Remove limit for pagination
+        // params.push(parseInt(limit));
         
         console.log('[Excessive Lags Table] Query:', query);
         console.log('[Excessive Lags Table] Params:', params);
@@ -2846,7 +2852,8 @@ app.get('/api/schedule/fs', async (req, res) => {
         const lag = req.query.lag;
         const freeFloat = req.query.free_float;
         const driving = req.query.driving;
-        const limit = req.query.limit || 20;
+        // Remove limit for pagination - let frontend handle pagination
+        // const limit = req.query.limit || 20;
         
         let filters = ["relationship_status = 'Incomplete'", "relationship_type = 'PR_FS'", "lag = '0'"];
         const params = [];
@@ -2904,10 +2911,10 @@ app.get('/api/schedule/fs', async (req, res) => {
             FROM activity_relationship_view
             ${whereClause}
             ORDER BY activity_id
-            LIMIT $${paramIndex}
         `;
         
-        params.push(parseInt(limit));
+        // Remove limit for pagination
+        // params.push(parseInt(limit));
         
         console.log('[FS Table] Query:', query);
         console.log('[FS Table] Params:', params);
@@ -2984,7 +2991,8 @@ app.get('/api/schedule/non-fs', async (req, res) => {
         const lag = req.query.lag;
         const freeFloat = req.query.free_float;
         const driving = req.query.driving;
-        const limit = req.query.limit || 20;
+        // Remove limit for pagination - let frontend handle pagination
+        // const limit = req.query.limit || 20;
         
         let filters = [
             "relationship_status = 'Incomplete'",
@@ -3046,10 +3054,10 @@ app.get('/api/schedule/non-fs', async (req, res) => {
             FROM activity_relationship_view
             ${whereClause}
             ORDER BY activity_id
-            LIMIT $${paramIndex}
         `;
         
-        params.push(parseInt(limit));
+        // Remove limit for pagination
+        // params.push(parseInt(limit));
         
         console.log('[Non-FS Table] Query:', query);
         console.log('[Non-FS Table] Params:', params);
@@ -3710,7 +3718,8 @@ app.get('/api/schedule/open-ends-percentage-history', async (req, res) => {
 app.get('/api/schedule/open-ends', async (req, res) => {
     try {
         const projectId = req.query.project_id;
-        const limit = req.query.limit || 20;
+        // Remove limit for pagination - let frontend handle pagination
+        // const limit = req.query.limit || 20;
         
         let filters = ["openends = 'Open End'"];
         const params = [];
@@ -3749,10 +3758,10 @@ app.get('/api/schedule/open-ends', async (req, res) => {
             FROM activityanalysisview
             ${whereClause}
             ORDER BY activityid
-            LIMIT $${params.length + 1}
         `;
         
-        params.push(parseInt(limit));
+        // Remove limit for pagination
+        // params.push(parseInt(limit));
         
         const result = await db.query(query, params);
         const rows = result.rows;
@@ -5358,7 +5367,8 @@ app.get('/api/schedule/constraints', async (req, res) => {
         const projectId = req.query.project_id;
         const activityType = req.query.activity_type;
         const activityStatus = req.query.activity_status;
-        const limit = req.query.limit || 20;
+        // Remove limit for pagination - let frontend handle pagination
+        // const limit = req.query.limit || 20;
         
         let filters = ["primaryconstraint IN ('CS_MSO','CS_MSOB','CS_MSOA','CS_MEO','CS_MEOB','CS_MEOA','CS_ALAP')", "activitystatus != 'Complete'"];
         const params = [];
@@ -5397,10 +5407,10 @@ app.get('/api/schedule/constraints', async (req, res) => {
             FROM activityanalysisview
             ${whereClause}
             ORDER BY activityid
-            LIMIT $${params.length + 1}
         `;
         
-        params.push(parseInt(limit));
+        // Remove limit for pagination
+        // params.push(parseInt(limit));
         
         const result = await db.query(query, params);
         const rows = result.rows;
@@ -5614,13 +5624,14 @@ app.get('/api/schedule/excessive-durations-percentage-history', async (req, res)
 // Excessive Durations Table Data endpoint
 app.get('/api/schedule/excessive-durations', async (req, res) => {
     try {
-        const limit = req.query.limit || 20;
+        // Remove limit for pagination - let frontend handle pagination
+        // const limit = req.query.limit || 20;
         const projectId = req.query.project_id;
         const activityType = req.query.activity_type;
         const activityStatus = req.query.activity_status;
-        const params = [limit];
+        const params = [];
         let projectFilter = '';
-        let paramIndex = 2; // Start from 2 since limit is $1
+        let paramIndex = 1; // Start from 1 since no limit
         
         if (projectId && projectId !== 'all') {
             projectFilter = `AND projectid = $${paramIndex++}`;
@@ -5650,9 +5661,9 @@ app.get('/api/schedule/excessive-durations', async (req, res) => {
                 activitystatus as "Activity Status"
             FROM activityanalysisview
             WHERE CAST(originalduration AS INTEGER) >= 20
+            AND activitystatus != 'Complete'
             ${projectFilter}
             ORDER BY CAST(originalduration AS INTEGER) DESC
-            LIMIT $1
         `;
 
         console.log('Executing table query:', query);
@@ -5860,13 +5871,14 @@ app.get('/api/schedule/negative-float-percentage-history', async (req, res) => {
 // Negative Total Float Table Data endpoint
 app.get('/api/schedule/negative-float', async (req, res) => {
     try {
-        const limit = req.query.limit || 20;
+        // Remove limit for pagination - let frontend handle pagination
+        // const limit = req.query.limit || 20;
         const projectId = req.query.project_id;
         const activityType = req.query.activity_type;
         const activityStatus = req.query.activity_status;
-        const params = [limit];
+        const params = [];
         let projectFilter = '';
-        let paramIndex = 2; // Start from 2 since limit is $1
+        let paramIndex = 1; // Start from 1 since no limit
         
         if (projectId && projectId !== 'all') {
             projectFilter = 'AND projectid = $2';
@@ -5904,7 +5916,6 @@ app.get('/api/schedule/negative-float', async (req, res) => {
             WHERE totalfloatdays < 0
             ${projectFilter}
             ORDER BY totalfloatdays ASC
-            LIMIT $1
         `;
 
         const result = await db.query(query, params);
@@ -6107,13 +6118,14 @@ app.get('/api/schedule/critical-float-percentage-history', async (req, res) => {
 // Critical Total Float Table Data endpoint
 app.get('/api/schedule/critical-float', async (req, res) => {
     try {
-        const limit = req.query.limit || 20;
+        // Remove limit for pagination - let frontend handle pagination
+        // const limit = req.query.limit || 20;
         const projectId = req.query.project_id;
         const activityType = req.query.activity_type;
         const activityStatus = req.query.activity_status;
-        const params = [limit];
+        const params = [];
         let projectFilter = '';
-        let paramIndex = 2; // Start from 2 since limit is $1
+        let paramIndex = 1; // Start from 1 since no limit
         
         if (projectId && projectId !== 'all') {
             projectFilter = 'AND projectid = $2';
@@ -6151,7 +6163,6 @@ app.get('/api/schedule/critical-float', async (req, res) => {
             WHERE totalfloatdays >= 0 AND totalfloatdays <= 15
             ${projectFilter}
             ORDER BY totalfloatdays ASC
-            LIMIT $1
         `;
 
         const result = await db.query(query, params);
@@ -6353,13 +6364,14 @@ app.get('/api/schedule/excessive-float-percentage-history', async (req, res) => 
 // Excessive Total Float Table Data endpoint
 app.get('/api/schedule/excessive-float', async (req, res) => {
     try {
-        const limit = req.query.limit || 20;
+        // Remove limit for pagination - let frontend handle pagination
+        // const limit = req.query.limit || 20;
         const projectId = req.query.project_id;
         const activityType = req.query.activity_type;
         const activityStatus = req.query.activity_status;
-        const params = [limit];
+        const params = [];
         let projectFilter = '';
-        let paramIndex = 2; // Start from 2 since limit is $1
+        let paramIndex = 1; // Start from 1 since no limit
         
         if (projectId && projectId !== 'all') {
             projectFilter = 'AND projectid = $2';
@@ -6397,7 +6409,6 @@ app.get('/api/schedule/excessive-float', async (req, res) => {
             WHERE totalfloatdays >= 40
             ${projectFilter}
             ORDER BY totalfloatdays DESC
-            LIMIT $1
         `;
 
         const result = await db.query(query, params);
@@ -6867,13 +6878,14 @@ app.get('/api/schedule/riding-data-date-percentage-history', async (req, res) =>
 // Riding Data Date Table Data endpoint
 app.get('/api/schedule/riding-data-date', async (req, res) => {
     try {
-        const limit = req.query.limit || 20;
+        // Remove limit for pagination - let frontend handle pagination
+        // const limit = req.query.limit || 20;
         const projectId = req.query.project_id;
         const activityType = req.query.activity_type;
         const activityStatus = req.query.activity_status;
-        const params = [limit];
+        const params = [];
         let projectFilter = '';
-        let paramIndex = 2; // Start from 2 since limit is $1
+        let paramIndex = 1; // Start from 1 since no limit
         
         if (projectId && projectId !== 'all') {
             projectFilter = 'AND projectid = $2';
@@ -6912,7 +6924,6 @@ app.get('/api/schedule/riding-data-date', async (req, res) => {
             WHERE ridingdatadate = 'Riding Data Date'
             ${projectFilter}
             ORDER BY activityid ASC
-            LIMIT $1
         `;
 
         const result = await db.query(query, params);
@@ -7180,10 +7191,11 @@ app.get('/api/schedule/resources', async (req, res) => {
         const projectId = req.query.project_id;
         const activityType = req.query.activity_type;
         const activityStatus = req.query.activity_status;
-        const limit = req.query.limit || 20;
-        const params = [limit];
+        // Remove limit for pagination - let frontend handle pagination
+        // const limit = req.query.limit || 20;
+        const params = [];
         let projectFilter = '';
-        let paramIndex = 2;
+        let paramIndex = 1;
         
         if (projectId && projectId !== 'all') {
             projectFilter = 'projectid = $2';
@@ -7232,8 +7244,7 @@ app.get('/api/schedule/resources', async (req, res) => {
             FROM activityanalysisview
             WHERE resource IS NOT NULL
             ${projectFilter ? ` AND ${projectFilter}` : ''}
-            ORDER BY "Activity ID"
-            LIMIT $1;`;
+            ORDER BY "Activity ID";`;
 
         console.log('[Resources Table] Query:', query);
         console.log('[Resources Table] Params:', params);
@@ -7370,6 +7381,225 @@ app.get('/api/schedule/non-fs-relationship-metrics', async (req, res) => {
         console.error('[Schedule API] Error in non-fs-relationship-metrics endpoint:', error);
         console.error('Detailed error:', error.stack);
         res.status(500).json({ error: 'Failed to fetch Non-FS Relationship Metrics data' });
+    }
+});
+
+// FS (Finish-to-Start) table data endpoint
+app.get('/api/schedule/fs', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        const relationshipType = req.query.relationship_type;
+        const lag = req.query.lag;
+        const freeFloat = req.query.free_float;
+        const driving = req.query.driving;
+        
+        const params = [];
+        let whereClause = 'WHERE relationship_type IN (\'PR_FS\', \'PR_FS1\')';
+        let paramIndex = 1;
+        
+        if (projectId && projectId !== 'all') {
+            whereClause += ` AND project_id = $${paramIndex}`;
+            params.push(projectId);
+            paramIndex++;
+        }
+        
+        if (relationshipType && relationshipType !== '') {
+            whereClause += ` AND relationship_type = $${paramIndex}`;
+            params.push(relationshipType);
+            paramIndex++;
+        }
+        
+        if (lag && lag !== '') {
+            whereClause += ` AND lag = $${paramIndex}`;
+            params.push(lag);
+            paramIndex++;
+        }
+        
+        if (freeFloat && freeFloat !== '') {
+            whereClause += ` AND free_float = $${paramIndex}`;
+            params.push(freeFloat);
+            paramIndex++;
+        }
+        
+        if (driving && driving !== '') {
+            whereClause += ` AND driving = $${paramIndex}`;
+            params.push(driving);
+            paramIndex++;
+        }
+
+        const query = `
+            SELECT 
+                pred_id as "Pred. ID",
+                succ_id as "Succ. ID",
+                pred_name as "Pred. Name",
+                succ_name as "Succ. Name",
+                relationship_type as "Relationship type",
+                lag as "Lag",
+                lead as "Lead",
+                excessive_lag as "ExcessiveLag",
+                driving as "Driving",
+                free_float as "FreeFloat",
+                relationship_status as "Relationship_Status"
+            FROM activity_relationship_view
+            ${whereClause}
+            ORDER BY pred_id, succ_id
+        `;
+
+        console.log('[FS Table] Query:', query);
+        console.log('[FS Table] Params:', params);
+
+        const result = await db.query(query, params);
+        console.log('[FS Table] Result count:', result.rows.length);
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Error fetching FS table data:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Leads table data endpoint
+app.get('/api/schedule/leads', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        const relationshipType = req.query.relationship_type;
+        const lag = req.query.lag;
+        const freeFloat = req.query.free_float;
+        const driving = req.query.driving;
+        
+        const params = [];
+        let whereClause = 'WHERE CAST(lag AS INTEGER) < 0';
+        let paramIndex = 1;
+        
+        if (projectId && projectId !== 'all') {
+            whereClause += ` AND project_id = $${paramIndex}`;
+            params.push(projectId);
+            paramIndex++;
+        }
+        
+        if (relationshipType && relationshipType !== '') {
+            whereClause += ` AND relationship_type = $${paramIndex}`;
+            params.push(relationshipType);
+            paramIndex++;
+        }
+        
+        if (lag && lag !== '') {
+            whereClause += ` AND lag = $${paramIndex}`;
+            params.push(lag);
+            paramIndex++;
+        }
+        
+        if (freeFloat && freeFloat !== '') {
+            whereClause += ` AND free_float = $${paramIndex}`;
+            params.push(freeFloat);
+            paramIndex++;
+        }
+        
+        if (driving && driving !== '') {
+            whereClause += ` AND driving = $${paramIndex}`;
+            params.push(driving);
+            paramIndex++;
+        }
+
+        const query = `
+            SELECT 
+                pred_id as "Pred. ID",
+                succ_id as "Succ. ID",
+                pred_name as "Pred. Name",
+                succ_name as "Succ. Name",
+                relationship_type as "Relationship type",
+                lag as "Lag",
+                lead as "Lead",
+                excessive_lag as "ExcessiveLag",
+                driving as "Driving",
+                free_float as "FreeFloat",
+                relationship_status as "Relationship_Status"
+            FROM activity_relationship_view
+            ${whereClause}
+            ORDER BY pred_id, succ_id
+        `;
+
+        console.log('[Leads Table] Query:', query);
+        console.log('[Leads Table] Params:', params);
+
+        const result = await db.query(query, params);
+        console.log('[Leads Table] Result count:', result.rows.length);
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Error fetching Leads table data:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Lags table data endpoint
+app.get('/api/schedule/lags', async (req, res) => {
+    try {
+        const projectId = req.query.project_id;
+        const relationshipType = req.query.relationship_type;
+        const lag = req.query.lag;
+        const freeFloat = req.query.free_float;
+        const driving = req.query.driving;
+        
+        const params = [];
+        let whereClause = 'WHERE CAST(lag AS INTEGER) > 0';
+        let paramIndex = 1;
+        
+        if (projectId && projectId !== 'all') {
+            whereClause += ` AND project_id = $${paramIndex}`;
+            params.push(projectId);
+            paramIndex++;
+        }
+        
+        if (relationshipType && relationshipType !== '') {
+            whereClause += ` AND relationship_type = $${paramIndex}`;
+            params.push(relationshipType);
+            paramIndex++;
+        }
+        
+        if (lag && lag !== '') {
+            whereClause += ` AND lag = $${paramIndex}`;
+            params.push(lag);
+            paramIndex++;
+        }
+        
+        if (freeFloat && freeFloat !== '') {
+            whereClause += ` AND free_float = $${paramIndex}`;
+            params.push(freeFloat);
+            paramIndex++;
+        }
+        
+        if (driving && driving !== '') {
+            whereClause += ` AND driving = $${paramIndex}`;
+            params.push(driving);
+            paramIndex++;
+        }
+
+        const query = `
+            SELECT 
+                pred_id as "Pred. ID",
+                succ_id as "Succ. ID",
+                pred_name as "Pred. Name",
+                succ_name as "Succ. Name",
+                relationship_type as "Relationship type",
+                lag as "Lag",
+                lead as "Lead",
+                excessive_lag as "ExcessiveLag",
+                driving as "Driving",
+                free_float as "FreeFloat",
+                relationship_status as "Relationship_Status"
+            FROM activity_relationship_view
+            ${whereClause}
+            ORDER BY pred_id, succ_id
+        `;
+
+        console.log('[Lags Table] Query:', query);
+        console.log('[Lags Table] Params:', params);
+
+        const result = await db.query(query, params);
+        console.log('[Lags Table] Result count:', result.rows.length);
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Error fetching Lags table data:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 });
 

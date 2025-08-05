@@ -1,0 +1,5 @@
+[33m43233c9[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m Add dropdown filters for all 14 metrics - Complete implementation of relationship-based and activity-based filters with real-time data filtering
+[33md79c87a[m Fix line chart grouping to show 4 distinct points for each project instead of combining projects with same date
+[33m53fd755[m Fix Non-FS relationship percentage calculation in line chart to match DAX formula
+[33mafa2957[m Update Open Ends third card to show Open Ends % instead of Remaining Activities
+[33mab0f80a[m Fix Resource Load Count calculation and update line chart percentage values
