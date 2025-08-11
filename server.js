@@ -5881,7 +5881,7 @@ app.get('/api/schedule/negative-float', async (req, res) => {
         let paramIndex = 1; // Start from 1 since no limit
         
         if (projectId && projectId !== 'all') {
-            projectFilter = 'AND projectid = $2';
+            projectFilter = 'AND projectid = $1';
             params.push(projectId);
             paramIndex++;
         }
@@ -6128,7 +6128,7 @@ app.get('/api/schedule/critical-float', async (req, res) => {
         let paramIndex = 1; // Start from 1 since no limit
         
         if (projectId && projectId !== 'all') {
-            projectFilter = 'AND projectid = $2';
+            projectFilter = 'AND projectid = $1';
             params.push(projectId);
             paramIndex++;
         }
@@ -6374,7 +6374,7 @@ app.get('/api/schedule/excessive-float', async (req, res) => {
         let paramIndex = 1; // Start from 1 since no limit
         
         if (projectId && projectId !== 'all') {
-            projectFilter = 'AND projectid = $2';
+            projectFilter = 'AND projectid = $1';
             params.push(projectId);
             paramIndex++;
         }
@@ -6888,7 +6888,7 @@ app.get('/api/schedule/riding-data-date', async (req, res) => {
         let paramIndex = 1; // Start from 1 since no limit
         
         if (projectId && projectId !== 'all') {
-            projectFilter = 'AND projectid = $2';
+            projectFilter = 'AND projectid = $1';
             params.push(projectId);
             paramIndex++;
         }
@@ -7198,14 +7198,14 @@ app.get('/api/schedule/resources', async (req, res) => {
         let paramIndex = 1;
         
         if (projectId && projectId !== 'all') {
-            projectFilter = 'projectid = $2';
+            projectFilter = 'projectid = $1';
             params.push(projectId);
             paramIndex++;
         }
         
         if (activityType && activityType !== '') {
             if (projectFilter === '') {
-                projectFilter = 'activitytype = $2';
+                projectFilter = 'activitytype = $1';
             } else {
                 projectFilter += ` AND activitytype = $${paramIndex}`;
             }
@@ -7215,7 +7215,7 @@ app.get('/api/schedule/resources', async (req, res) => {
         
         if (activityStatus && activityStatus !== '') {
             if (projectFilter === '') {
-                projectFilter = 'activitystatus = $2';
+                projectFilter = 'activitystatus = $1';
             } else {
                 projectFilter += ` AND activitystatus = $${paramIndex}`;
             }
@@ -7225,7 +7225,7 @@ app.get('/api/schedule/resources', async (req, res) => {
             if (projectFilter === '') {
                 projectFilter = 'activitystatus IN (\'Active\', \'NotStart\')';
             } else {
-                projectFilter += ` AND activitystatus IN ('Active', 'NotStart')`;
+                projectFilter += ` AND activitystatus IN ('Active', \'NotStart\')`;
             }
         }
 
